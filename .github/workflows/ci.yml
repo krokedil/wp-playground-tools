@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm run lint
+
+  # Parity insurance for every consumer: scaffold a fixture plugin with init,
+  # boot an ephemeral development server, and assert WordPress answers.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: wp-playground-tools
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: wp-playground-tools/.nvmrc
+      - name: Scaffold a fixture plugin
+        run: |
+          mkdir smoke-plugin && cd smoke-plugin
+          printf '<?php\n/**\n * Plugin Name: Smoke Plugin\n */\n' > smoke-plugin.php
+          node ../wp-playground-tools/src/cli.mjs init
+          # Consume the local checkout instead of the published tag.
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.devDependencies['@krokedil/wp-playground-tools'] = 'file:../wp-playground-tools';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, '\t'));
+          "
+          pnpm install
+      - name: Boot the development server and probe wp-login.php
+        working-directory: smoke-plugin
+        run: |
+          pnpm run playground:server-development &
+          SERVER_PID=$!
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8881/wp-login.php -o /dev/null 2>/dev/null; then
+              echo "WordPress is up"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "server never came up" >&2
+          kill $SERVER_PID || true
+          exit 1

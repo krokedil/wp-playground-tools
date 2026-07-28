@@ -1,0 +1,51 @@
+{
+	"name": "@krokedil/wp-playground-tools",
+	"version": "1.0.0",
+	"description": "Shared WordPress Playground dev tooling for Krokedil WooCommerce plugins: one-command bootstrap, worktree-isolated sites, generated blueprints, WC seeding, PR screenshots, and HTTPS via ngrok tunnel or local proxy.",
+	"type": "module",
+	"license": "GPL-3.0-or-later",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/krokedil/wp-playground-tools.git"
+	},
+	"bin": {
+		"krokedil-playground": "src/cli.mjs"
+	},
+	"exports": {
+		".": "./src/index.mjs",
+		"./cli": "./src/cli.mjs",
+		"./capture": "./src/screenshots/capture.mjs"
+	},
+	"files": [
+		"src",
+		"assets",
+		"README.md",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"test": "node --test tests/*.test.mjs",
+		"lint": "eslint ."
+	},
+	"engines": {
+		"node": ">=20.19.0 <21",
+		"pnpm": ">=9.13.0"
+	},
+	"packageManager": "pnpm@9.15.9",
+	"dependencies": {
+		"@wp-playground/cli": "3.1.29",
+		"cross-spawn": "^7.0.6"
+	},
+	"peerDependencies": {
+		"@playwright/test": ">=1.50.0"
+	},
+	"peerDependenciesMeta": {
+		"@playwright/test": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@wordpress/eslint-plugin": "^25.0.0",
+		"eslint": "^9.39.4",
+		"prettier": "^3.6.0"
+	}
+}

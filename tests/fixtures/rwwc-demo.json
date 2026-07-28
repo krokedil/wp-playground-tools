@@ -1,0 +1,280 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "description": "Krokedil WP CI generated WordPress Playground Blueprint",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "latest"
+  },
+  "landingPage": "/wp-admin/plugins.php",
+  "login": true,
+  "steps": [
+    {
+      "step": "defineWpConfigConsts",
+      "consts": {
+        "WP_DEBUG": false
+      }
+    },
+    {
+      "step": "resetData"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php @unlink('/wordpress/wp-content/plugins/hello.php'); $akismet = '/wordpress/wp-content/plugins/akismet'; if (is_dir($akismet)) { $items = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($akismet, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST); foreach ($items as $item) { $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname()); } @rmdir($akismet); }"
+    },
+    {
+      "step": "installTheme",
+      "themeData": {
+        "resource": "wordpress.org/themes",
+        "slug": "storefront"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp theme delete --all"
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp widget reset --all"
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp theme mod set storefront_product_pagination 0"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "blogname": "Returns and Withdrawals",
+        "blogdescription": "Demo by Krokedil",
+        "date_format": "Y-m-d",
+        "time_format": "H:i",
+        "start_of_week": "1",
+        "timezone_string": "Europe/Stockholm",
+        "blog_public": "0",
+        "show_on_front": "page",
+        "permalink_structure": "/%postname%/"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require '/wordpress/wp-load.php'; $wp_rewrite->flush_rules();"
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "woocommerce"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_onboarding_profile": {
+          "skipped": true
+        },
+        "woocommerce_task_list_hidden": "yes",
+        "woocommerce_task_list_reminder_bar_hidden": "yes",
+        "woocommerce_allow_tracking": "no",
+        "woocommerce_show_marketplace_suggestions": "no",
+        "woocommerce_block_product_tour_shown": "yes",
+        "woocommerce_orders_report_date_tour_shown": "yes",
+        "woocommerce_revenue_report_date_tour_shown": "yes"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp transient delete _wc_activation_redirect"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_default_country": "SE",
+        "woocommerce_currency": "SEK",
+        "woocommerce_price_num_decimals": "2"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp wc product create --name='Simple product' --sku='simple-product' --regular_price='99.99' --virtual=false --downloadable=false --user=1"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; $page = get_page_by_path('refund_returns'); if ($page) { wp_publish_post($page->ID); update_option('woocommerce_terms_page_id', $page->ID); }"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; $shop_page_id = get_option('woocommerce_shop_page_id'); if ($shop_page_id) { update_option('page_on_front', $shop_page_id); update_option('show_on_front', 'page'); }"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; $checkout_page_id = get_option('woocommerce_checkout_page_id'); if ($checkout_page_id) { wp_update_post(['ID' => $checkout_page_id, 'post_content' => '[woocommerce_checkout]']); }"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_coming_soon": "no",
+        "woocommerce_store_pages_only": "no"
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_store_address": "Test Road 1",
+        "woocommerce_store_address_2": "",
+        "woocommerce_store_city": "Arvika",
+        "woocommerce_store_postcode": "67131",
+        "woocommerce_allowed_countries": "specific",
+        "woocommerce_all_except_countries": "",
+        "woocommerce_specific_allowed_countries": [
+          "SE"
+        ],
+        "woocommerce_ship_to_countries": "",
+        "woocommerce_specific_ship_to_countries": "",
+        "woocommerce_default_customer_address": "base",
+        "woocommerce_calc_taxes": "yes",
+        "woocommerce_enable_coupons": "yes",
+        "woocommerce_calc_discounts_sequentially": "no",
+        "woocommerce_currency_pos": "right_space",
+        "woocommerce_price_thousand_sep": " ",
+        "woocommerce_price_decimal_sep": ","
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_cart_redirect_after_add": "no",
+        "woocommerce_enable_ajax_add_to_cart": "yes",
+        "woocommerce_weight_unit": "kg",
+        "woocommerce_dimension_unit": "cm",
+        "woocommerce_manage_stock": "no",
+        "woocommerce_hold_stock_minutes": "60",
+        "woocommerce_hide_out_of_stock_items": "no"
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_prices_include_tax": "yes",
+        "woocommerce_tax_based_on": "shipping",
+        "woocommerce_shipping_tax_class": "inherit",
+        "woocommerce_tax_round_at_subtotal": "no",
+        "woocommerce_tax_classes": "",
+        "woocommerce_tax_display_shop": "incl",
+        "woocommerce_tax_display_cart": "incl",
+        "woocommerce_price_display_suffix": "",
+        "woocommerce_tax_total_display": "itemized"
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_enable_shipping_calc": "yes",
+        "woocommerce_shipping_cost_requires_address": "no",
+        "woocommerce_shipping_hide_rates_when_free": "no",
+        "woocommerce_ship_to_destination": "billing",
+        "woocommerce_shipping_debug_mode": "no"
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_pickup_location_settings": [],
+        "pickup_location_pickup_locations": []
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_enable_guest_checkout": "yes",
+        "woocommerce_enable_checkout_login_reminder": "no",
+        "woocommerce_enable_signup_and_login_from_checkout": "no",
+        "woocommerce_enable_myaccount_registration": "no",
+        "woocommerce_registration_generate_password": "yes",
+        "woocommerce_delete_inactive_accounts": {
+          "number": "",
+          "unit": "months"
+        },
+        "woocommerce_trash_pending_orders": "",
+        "woocommerce_trash_failed_orders": "",
+        "woocommerce_trash_cancelled_orders": "",
+        "woocommerce_anonymize_refunded_orders": {
+          "number": "",
+          "unit": "months"
+        },
+        "woocommerce_anonymize_completed_orders": {
+          "number": "",
+          "unit": "months"
+        }
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_cod_settings": {
+          "enabled": "yes",
+          "title": "Cash on delivery",
+          "description": "Pay with cash upon delivery.",
+          "instructions": "Pay with cash upon delivery.",
+          "enable_for_methods": [],
+          "enable_for_virtual": "yes"
+        }
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_api_enabled": "no",
+        "woocommerce_custom_orders_table_enabled": "no",
+        "woocommerce_custom_orders_table_data_sync_enabled": "",
+        "woocommerce_feature_rate_limit_checkout_enabled": "no",
+        "woocommerce_feature_order_attribution_enabled": "yes",
+        "woocommerce_feature_site_visibility_badge_enabled": "yes",
+        "woocommerce_feature_remote_logging_enabled": "yes",
+        "woocommerce_feature_email_improvements_enabled": "yes",
+        "woocommerce_feature_blueprint_enabled": "yes",
+        "woocommerce_feature_product_block_editor_enabled": "no",
+        "woocommerce_hpos_fts_index_enabled": "no",
+        "woocommerce_hpos_datastore_caching_enabled": "no",
+        "woocommerce_feature_block_email_editor_enabled": "no",
+        "woocommerce_feature_cost_of_goods_sold_enabled": "no"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp plugin activate returns-and-withdrawals --skip-plugins --skip-themes"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "rwwc_enable_returns": "yes",
+        "rwwc_enable_withdrawals": "yes",
+        "rwwc_return_available_days": "30",
+        "rwwc_activate_exclude_products": "yes",
+        "rwwc_activate_free_shipping_coupon": "yes",
+        "rwwc_free_shipping_coupon_days": "14",
+        "rwwc_offer_return_shipment": "yes",
+        "rwwc_return_shipment_price": "49",
+        "rwwc_repay_shipping_cost": "yes_full_return",
+        "rwwc_return_order_number_prefix": "-R",
+        "rwwc_completed_return_parent_order_status": "no"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; global $wpdb; update_user_meta( 1, $wpdb->get_blog_prefix() . 'persisted_preferences', array( 'core/edit-post' => array( 'welcomeGuide' => false, 'welcomeGuideStyles' => false ), 'core/edit-site' => array( 'welcomeGuide' => false, 'welcomeGuideStyles' => false ), 'core/editor' => array( 'welcomeGuide' => false ), '_modified' => gmdate( 'Y-m-d' ) . 'T' . gmdate( 'H:i:s' ) . '.000Z' ) );"
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp post create --post_type=page --post_title='Returns' --post_name=returns --post_status=publish --post_content='<!-- wp:rwwc/return /-->'"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire_once '/wordpress/wp-load.php';\nif ( ! function_exists( 'wc_create_order' ) ) {\n  return;\n}\n$product = wc_get_product( wc_get_product_id_by_sku( 'simple-product' ) );\nif ( ! $product ) {\n  return;\n}\n$statuses = array( 'completed', 'processing', 'refunded' );\nforeach ( $statuses as $status ) {\n  $order = wc_create_order( array( 'customer_id' => 1 ) );\n  if ( is_wp_error( $order ) ) {\n    continue;\n  }\n  $order->add_product( $product, 1 );\n  $order->set_address(\n    array(\n      'first_name' => 'Test',\n      'last_name'  => 'Customer',\n      'address_1'  => 'Test Road 1',\n      'city'       => 'Arvika',\n      'postcode'   => '67131',\n      'country'    => 'SE',\n      'email'      => 'test@example.com',\n    ),\n    'billing'\n  );\n  $order->calculate_totals();\n  $order->update_status( $status );\n  $order->save();\n}"
+    }
+  ]
+}

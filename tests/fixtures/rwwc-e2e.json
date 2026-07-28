@@ -1,0 +1,143 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "description": "Krokedil WP CI generated WordPress Playground Blueprint",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "beta"
+  },
+  "landingPage": "/wp-admin/plugins.php",
+  "login": true,
+  "steps": [
+    {
+      "step": "resetData"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php @unlink('/wordpress/wp-content/plugins/hello.php'); $akismet = '/wordpress/wp-content/plugins/akismet'; if (is_dir($akismet)) { $items = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($akismet, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST); foreach ($items as $item) { $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname()); } @rmdir($akismet); }"
+    },
+    {
+      "step": "installTheme",
+      "themeData": {
+        "resource": "wordpress.org/themes",
+        "slug": "storefront"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp theme delete --all"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "blogname": "Returns and Withdrawals",
+        "blogdescription": "E2E by Krokedil",
+        "date_format": "Y-m-d",
+        "time_format": "H:i",
+        "start_of_week": "1",
+        "timezone_string": "Europe/Stockholm",
+        "blog_public": "0",
+        "show_on_front": "page",
+        "permalink_structure": "/%postname%/"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require '/wordpress/wp-load.php'; $wp_rewrite->flush_rules();"
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "woocommerce"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_onboarding_profile": {
+          "skipped": true
+        },
+        "woocommerce_task_list_hidden": "yes",
+        "woocommerce_task_list_reminder_bar_hidden": "yes",
+        "woocommerce_allow_tracking": "no",
+        "woocommerce_show_marketplace_suggestions": "no",
+        "woocommerce_block_product_tour_shown": "yes",
+        "woocommerce_orders_report_date_tour_shown": "yes",
+        "woocommerce_revenue_report_date_tour_shown": "yes"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp transient delete _wc_activation_redirect"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_default_country": "SE",
+        "woocommerce_currency": "SEK",
+        "woocommerce_price_num_decimals": "2"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp wc product create --name='Simple product' --sku='simple-product' --regular_price='99.99' --virtual=false --downloadable=false --user=1"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; $page = get_page_by_path('refund_returns'); if ($page) { wp_publish_post($page->ID); update_option('woocommerce_terms_page_id', $page->ID); }"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; $shop_page_id = get_option('woocommerce_shop_page_id'); if ($shop_page_id) { update_option('page_on_front', $shop_page_id); update_option('show_on_front', 'page'); }"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; $checkout_page_id = get_option('woocommerce_checkout_page_id'); if ($checkout_page_id) { wp_update_post(['ID' => $checkout_page_id, 'post_content' => '[woocommerce_checkout]']); }"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_coming_soon": "no",
+        "woocommerce_store_pages_only": "no"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp plugin activate returns-and-withdrawals --skip-plugins --skip-themes"
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "rwwc_enable_returns": "yes",
+        "rwwc_enable_withdrawals": "yes",
+        "rwwc_return_available_days": "30",
+        "rwwc_activate_exclude_products": "yes",
+        "rwwc_activate_free_shipping_coupon": "yes",
+        "rwwc_free_shipping_coupon_days": "14",
+        "rwwc_offer_return_shipment": "yes",
+        "rwwc_return_shipment_price": "49",
+        "rwwc_repay_shipping_cost": "yes_full_return",
+        "rwwc_return_order_number_prefix": "-R",
+        "rwwc_completed_return_parent_order_status": "no"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; global $wpdb; update_user_meta( 1, $wpdb->get_blog_prefix() . 'persisted_preferences', array( 'core/edit-post' => array( 'welcomeGuide' => false, 'welcomeGuideStyles' => false ), 'core/edit-site' => array( 'welcomeGuide' => false, 'welcomeGuideStyles' => false ), 'core/editor' => array( 'welcomeGuide' => false ), '_modified' => gmdate( 'Y-m-d' ) . 'T' . gmdate( 'H:i:s' ) . '.000Z' ) );"
+    },
+    {
+      "step": "wp-cli",
+      "command": "wp post create --post_type=page --post_title='Returns' --post_name=returns --post_status=publish --post_content='<!-- wp:rwwc/return /-->'"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire_once '/wordpress/wp-load.php';\nif ( ! function_exists( 'wc_create_order' ) ) {\n  return;\n}\n$product = wc_get_product( wc_get_product_id_by_sku( 'simple-product' ) );\nif ( ! $product ) {\n  return;\n}\n$statuses = array( 'completed', 'processing', 'refunded' );\nforeach ( $statuses as $status ) {\n  $order = wc_create_order( array( 'customer_id' => 1 ) );\n  if ( is_wp_error( $order ) ) {\n    continue;\n  }\n  $order->add_product( $product, 1 );\n  $order->set_address(\n    array(\n      'first_name' => 'Test',\n      'last_name'  => 'Customer',\n      'address_1'  => 'Test Road 1',\n      'city'       => 'Arvika',\n      'postcode'   => '67131',\n      'country'    => 'SE',\n      'email'      => 'test@example.com',\n    ),\n    'billing'\n  );\n  $order->calculate_totals();\n  $order->update_status( $status );\n  $order->save();\n}"
+    }
+  ]
+}
