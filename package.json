@@ -36,12 +36,12 @@
 	},
 	"prettier": "@wordpress/prettier-config",
 	"engines": {
-		"node": ">=20.19.0 <21",
+		"node": ">=20.19.0",
 		"pnpm": ">=9.13.0"
 	},
 	"packageManager": "pnpm@9.15.9",
 	"dependencies": {
-		"@wp-playground/cli": "3.1.29",
+		"@wp-playground/cli": "3.1.47",
 		"cross-spawn": "^7.0.6"
 	},
 	"peerDependencies": {

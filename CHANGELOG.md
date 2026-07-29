@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
+  crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),
+  shipped in 3.1.36), so the Node `<21` ceiling is gone.
+- Node handling: `engines.node` relaxed to `>=20.19.0` (here and in scaffolded
+  consumers); the `.nvmrc`/`.npmrc` pin moves from 20.19.0 (EOL) to 22.23.2
+  (22 LTS). `init --update` rewrites an existing `use-node-version` pin and
+  drops the stale "breaks on Node 22+" comment; the provisioning-time Node
+  guard now only enforces the floor.
+- Fix: `init` now restores the `#semver:^1` range on the dev dependency spec
+  when `pnpm add` saved it as a bare branch-tracking git URL (pnpm normalizes
+  the spec on save — all versions, 9 through 11). Deliberate `#committish`
+  pins are left untouched. Install docs now end with a `pnpm install` to
+  realign the lockfile. (Found onboarding klarna-payments-for-woocommerce.)
+- Fix: `init` rewrote the consumer's whole `package.json` (and a pre-existing
+  `.claude/launch.json`) with tab indentation; the existing indentation is now
+  detected and preserved (tabs remain the default for new files). (Observed
+  onboarding klarna-payments-for-woocommerce.)
 - Package-manager detection, mirroring Krokedil CI: the Node manager is read
   from package.json's `packageManager` (fallback `devEngines.packageManager`,
   string or object form) — pnpm iff declared, npm otherwise; lockfile presence
@@ -22,7 +39,7 @@
   plugins. Existing consumers pick it up with `init --update`; npm plugins
   stamped by older inits must also delete the stamped `packageManager` +
   `engines.pnpm` by hand (see docs/onboarding.md).
-- Provisioning on out-of-range Node only attempts the `pnpm exec node`
+- Provisioning on too-old Node (< 20.19) only attempts the `pnpm exec node`
   repin for pnpm-managed plugins (or when already running under pnpm);
   npm plugins get an `nvm use` message instead.
 

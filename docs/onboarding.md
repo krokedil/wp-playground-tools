@@ -4,7 +4,7 @@ Step-by-step guide for adopting `@krokedil/wp-playground-tools` in a plugin repo
 
 ## 0. Prerequisites
 
-- **pnpm >= 9.13 or npm**, matching the plugin, and git. The tool picks the manager the same way Krokedil CI does: from `packageManager` (or `devEngines.packageManager`) in package.json — pnpm iff declared, npm otherwise (lockfiles are ignored). For pnpm plugins Node is handled for you: `init` pins `use-node-version=20.19.0` in `.npmrc`, so pnpm downloads and uses the right Node automatically. npm plugins get `.nvmrc` only — run Node 20 yourself (`nvm use`) for the first boot and `--fresh` runs.
+- **pnpm >= 9.13 or npm**, matching the plugin, and git. The tool picks the manager the same way Krokedil CI does: from `packageManager` (or `devEngines.packageManager`) in package.json — pnpm iff declared, npm otherwise (lockfiles are ignored). For pnpm plugins Node is handled for you: `init` pins `use-node-version=22.23.2` in `.npmrc`, so pnpm downloads and uses the right Node automatically. npm plugins get `.nvmrc` only — any Node >=20.19 works (`.nvmrc` pins 22 LTS for nvm users).
 - The plugin's main PHP file carries a `Plugin Name:` header at the repo root — `init` infers the slug from it (falls back to the directory name).
 - The install spec `#semver:^1` resolves against this repo's `vX.Y.Z` git tags; new releases are picked up with `pnpm update`.
 
@@ -13,9 +13,12 @@ Step-by-step guide for adopting `@krokedil/wp-playground-tools` in a plugin repo
 ```sh
 pnpm add -D "@krokedil/wp-playground-tools@github:krokedil/wp-playground-tools#semver:^1"
 pnpm exec krokedil-playground init
+pnpm install
 ```
 
-For an npm plugin:
+`pnpm add` resolves the `#semver:^1` range (you get the newest `v1.x.y` tag) but saves the dependency in `package.json` **without** it — a bare git URL that would track the default branch instead of releases. `init` corrects the saved spec back to `#semver:^1`, and the trailing `pnpm install` realigns the lockfile with it (skipping it fails `--frozen-lockfile` installs later).
+
+For an npm plugin (npm keeps the `#semver:` range on save, so no trailing install is needed):
 
 ```sh
 npm i -D "@krokedil/wp-playground-tools@github:krokedil/wp-playground-tools#semver:^1"

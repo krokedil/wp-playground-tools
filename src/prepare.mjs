@@ -2,7 +2,7 @@
  * Bootstrap + launcher for the WordPress Playground dev environments.
  *
  * Responsibilities, in order:
- *   1. Guard the Node version (the Playground CLI's --reset path breaks on Node 22+).
+ *   1. Guard the Node version (the Playground CLI needs Node >=20.19).
  *   2. Ensure prerequisites a fresh git worktree lacks, idempotently: composer
  *      install (config.composer.markers), a Node install (node_modules; pnpm
  *      or npm, detected from package.json like Krokedil CI — see pm.mjs), and
@@ -48,14 +48,16 @@ export const REASON_MESSAGES = {
 // --- Pure helpers (exported for tests) -------------------------------------
 
 /**
- * Whether a Node version string satisfies the supported >=20.19.0 <21 pin.
+ * Whether a Node version string satisfies the supported >=20.19.0 floor.
+ * (The old <21 ceiling — the CLI's --reset used to crash on Node 22+ — was
+ * lifted when upstream fixed it in @wp-playground/cli 3.1.36.)
  *
- * @param {string} version e.g. process.versions.node ("20.19.0").
+ * @param {string} version e.g. process.versions.node ("22.23.2").
  * @return {boolean} True when within range.
  */
 export function nodeSatisfiesPin(version) {
 	const [major, minor] = version.split('.').map(Number);
-	return major === 20 && minor >= 19;
+	return major > 20 || (major === 20 && minor >= 19);
 }
 
 /**
@@ -200,14 +202,13 @@ function fail(msg) {
 }
 
 /**
- * Ensure Node 20 for a provisioning (--reset) run. The Playground CLI's reset
- * uses an rmdirSync API removed in Node 22+, so only provisioning needs the pin
- * (warm boots / server / setup run on any Node). When the running Node is out
- * of range — e.g. preview_start launches us via npm, which ignores the .npmrc
- * pnpm pin — re-exec the entry script under pnpm's pinned Node 20 (.npmrc
- * use-node-version). The repin only works under pnpm, so it's attempted only
- * for pnpm-managed plugins (or when already running under pnpm, e.g. this
- * repo's sandbox scripts); otherwise abort with an actionable message.
+ * Ensure a supported Node (>=20.19) for a provisioning (--reset) run. When the
+ * running Node is too old — e.g. preview_start launches us via npm, which
+ * ignores the .npmrc pnpm pin — re-exec the entry script under pnpm's pinned
+ * Node (.npmrc use-node-version). The repin only works under pnpm, so it's
+ * attempted only for pnpm-managed plugins (or when already running under
+ * pnpm, e.g. this repo's sandbox scripts); otherwise abort with an
+ * actionable message.
  *
  * @param {string} root Plugin root (cwd for the re-exec).
  */
@@ -234,12 +235,12 @@ export function ensureNodeForProvisioning(root) {
 		}
 	}
 	fail(
-		`Node ${process.versions.node} can't provision: the Playground CLI's ` +
-			`--reset needs Node 20 (>=20.19.0 <21; it breaks on Node 22+). ` +
+		`Node ${process.versions.node} can't provision: the Playground CLI ` +
+			`needs Node >=20.19.0. ` +
 			(canRepin
-				? `Run via pnpm, which auto-pins Node 20 (.npmrc): ` +
+				? `Run via pnpm, which auto-pins a supported Node (.npmrc): ` +
 					`"pnpm run playground:start" — or "nvm use" first.`
-				: `Run "nvm use" (or "nvm install 20.19") first.`)
+				: `Run "nvm use" (or any Node >=20.19) first.`)
 	);
 }
 
@@ -408,8 +409,9 @@ export async function launch(root, config, modeName, userArgs) {
 		));
 	}
 
-	// Only a provisioning (--reset) run needs Node 20; this may re-exec under
-	// pnpm's pinned Node and exit, so do it before any logging or installs.
+	// Only a provisioning (--reset) run guards the Node version; this may
+	// re-exec under pnpm's pinned Node and exit, so do it before any logging
+	// or installs.
 	if (provisioning) {
 		ensureNodeForProvisioning(root);
 	}

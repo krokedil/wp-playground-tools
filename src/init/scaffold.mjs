@@ -38,8 +38,21 @@ const MODE_SCRIPTS = {
 	e2e: ['playground:server-e2e', 'node tools/playground.mjs server e2e'],
 };
 
-/** The Node version pin stamped into consumers (kept next to nodeSatisfiesPin). */
-export const NODE_PIN = '20.19.0';
+/**
+ * The Node version pin stamped into consumers' .nvmrc/.npmrc. Must satisfy
+ * nodeSatisfiesPin() in src/prepare.mjs — keep the two in sync.
+ */
+export const NODE_PIN = '22.23.2';
+
+/**
+ * The minimum Node written into consumers' engines. Must equal the floor
+ * enforced by nodeSatisfiesPin() in src/prepare.mjs — keep the two in sync.
+ */
+export const NODE_FLOOR = '20.19.0';
+
+/** Comment written above the use-node-version pin in consumers' .npmrc. */
+const NPMRC_PIN_COMMENT =
+	'# pnpm downloads/uses this Node for every run, so playground runs are reproducible across machines.';
 
 /** The dependency spec written into consumers' package.json. */
 export const PACKAGE_SPEC = 'github:krokedil/wp-playground-tools#semver:^1';
@@ -101,6 +114,18 @@ function ensureLines(file, lines) {
 	const glue = current && !current.endsWith('\n') ? '\n' : '';
 	fs.writeFileSync(file, current + glue + missing.join('\n') + '\n');
 	return true;
+}
+
+/**
+ * Detect the indentation used in a JSON file so a rewrite doesn't reformat
+ * every line: the whitespace prefix of the first indented line, tab when
+ * there is none (new files).
+ *
+ * @param {string|null} content File content, or null when the file is new.
+ * @return {string} The indent string.
+ */
+function detectIndent(content) {
+	return content?.match(/^([ \t]+)\S/m)?.[1] ?? '\t';
 }
 
 /**
@@ -192,16 +217,22 @@ export async function scaffold(root, args) {
 			if (update) {
 				fs.writeFileSync(
 					npmrc,
-					npmrcBody.replace(
-						/^use-node-version=.*$/m,
-						`use-node-version=${NODE_PIN}`
-					)
+					npmrcBody
+						.replace(
+							/^use-node-version=.*$/m,
+							`use-node-version=${NODE_PIN}`
+						)
+						// Drop the pre-1.2.0 rationale (upstream fixed --reset on Node 22+).
+						.replace(
+							/^# pnpm downloads\/uses this Node for every run \(the Playground CLI's --reset path breaks on Node 22\+\)\.$/m,
+							NPMRC_PIN_COMMENT
+						)
 				);
 				log('updated .npmrc node pin');
 			}
 		} else {
 			ensureLines(npmrc, [
-				"# pnpm downloads/uses this Node for every run (the Playground CLI's --reset path breaks on Node 22+).",
+				NPMRC_PIN_COMMENT,
 				`use-node-version=${NODE_PIN}`,
 			]);
 			log('pinned Node in .npmrc');
@@ -210,14 +241,18 @@ export async function scaffold(root, args) {
 
 	// --- package.json (merged) ---
 	const pkgPath = path.join(root, 'package.json');
-	const pkg = fs.existsSync(pkgPath)
-		? JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
-		: {
-				name: `${slug}-dev`,
-				private: true,
-				type: 'module',
-				version: '0.0.0',
-			};
+	const pkgRaw = fs.existsSync(pkgPath)
+		? fs.readFileSync(pkgPath, 'utf8')
+		: null;
+	const pkg =
+		pkgRaw !== null
+			? JSON.parse(pkgRaw)
+			: {
+					name: `${slug}-dev`,
+					private: true,
+					type: 'module',
+					version: '0.0.0',
+				};
 	pkg.scripts = pkg.scripts ?? {};
 	const scripts = {
 		...Object.fromEntries(modes.map((mode) => MODE_SCRIPTS[mode])),
@@ -242,13 +277,27 @@ export async function scaffold(root, args) {
 		}
 	}
 	pkg.devDependencies = pkg.devDependencies ?? {};
-	if (!pkg.devDependencies['@krokedil/wp-playground-tools']) {
+	const depSpec = pkg.devDependencies['@krokedil/wp-playground-tools'];
+	if (!depSpec) {
 		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
 		scriptsChanged = true;
+	} else if (
+		/krokedil\/wp-playground-tools(\.git)?$/.test(depSpec) &&
+		!depSpec.includes('#')
+	) {
+		// `pnpm add` resolves the #semver:^1 range but saves the spec
+		// normalized to the bare git URL, which tracks the default branch.
+		// A spec without a #committish is that accident — restore the
+		// tag-following range. Deliberate pins (#main, #v1.2.3) are kept.
+		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
+		scriptsChanged = true;
+		log(
+			`corrected the dev dependency spec to ${PACKAGE_SPEC} (pnpm add saves it without the #semver range)`
+		);
 	}
 	pkg.engines = {
 		...(pkg.engines ?? {}),
-		node: `>=${NODE_PIN} <21`,
+		node: `>=${NODE_FLOOR}`,
 	};
 	if (manager === 'pnpm') {
 		pkg.engines.pnpm = pkg.engines?.pnpm ?? '>=9.13.0';
@@ -260,7 +309,10 @@ export async function scaffold(root, args) {
 			pkg.packageManager = pkg.packageManager ?? 'pnpm@9.15.9';
 		}
 	}
-	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
+	fs.writeFileSync(
+		pkgPath,
+		JSON.stringify(pkg, null, detectIndent(pkgRaw)) + '\n'
+	);
 	if (scriptsChanged) {
 		log(
 			`merged package.json (scripts, dev dependency, engines) — run ${manager} install`
@@ -269,9 +321,13 @@ export async function scaffold(root, args) {
 
 	// --- .claude/launch.json (playground entries replaced, others preserved) ---
 	const launchPath = path.join(root, '.claude', 'launch.json');
-	const launch = fs.existsSync(launchPath)
-		? JSON.parse(fs.readFileSync(launchPath, 'utf8'))
-		: { version: '0.0.1', configurations: [] };
+	const launchRaw = fs.existsSync(launchPath)
+		? fs.readFileSync(launchPath, 'utf8')
+		: null;
+	const launch =
+		launchRaw !== null
+			? JSON.parse(launchRaw)
+			: { version: '0.0.1', configurations: [] };
 	launch.configurations = (launch.configurations ?? []).filter(
 		(c) => !/^playground-/.test(c.name ?? '')
 	);
@@ -285,7 +341,10 @@ export async function scaffold(root, args) {
 		});
 	}
 	fs.mkdirSync(path.dirname(launchPath), { recursive: true });
-	fs.writeFileSync(launchPath, JSON.stringify(launch, null, '\t') + '\n');
+	fs.writeFileSync(
+		launchPath,
+		JSON.stringify(launch, null, detectIndent(launchRaw)) + '\n'
+	);
 	log('wrote .claude/launch.json preview entries');
 
 	// --- CLAUDE.md section (generated between markers, rest preserved) ---

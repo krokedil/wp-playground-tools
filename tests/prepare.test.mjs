@@ -13,13 +13,13 @@ import {
 	nodeSatisfiesPin,
 } from '../src/prepare.mjs';
 
-test('nodeSatisfiesPin accepts only >=20.19 <21', () => {
+test('nodeSatisfiesPin accepts only >=20.19', () => {
 	assert.equal(nodeSatisfiesPin('20.19.0'), true);
 	assert.equal(nodeSatisfiesPin('20.20.5'), true);
+	assert.equal(nodeSatisfiesPin('22.23.2'), true);
+	assert.equal(nodeSatisfiesPin('24.18.0'), true);
 	assert.equal(nodeSatisfiesPin('20.18.3'), false);
 	assert.equal(nodeSatisfiesPin('18.20.0'), false);
-	assert.equal(nodeSatisfiesPin('22.1.0'), false);
-	assert.equal(nodeSatisfiesPin('21.0.0'), false);
 });
 
 test('computeSiteHash matches the CLI site key (sha256 of cwd)', () => {
