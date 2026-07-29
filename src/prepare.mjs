@@ -4,8 +4,9 @@
  * Responsibilities, in order:
  *   1. Guard the Node version (the Playground CLI's --reset path breaks on Node 22+).
  *   2. Ensure prerequisites a fresh git worktree lacks, idempotently: composer
- *      install (config.composer.markers), pnpm install (node_modules), and the
- *      plugin's JS build (config.build.markers, omitted for buildless plugins).
+ *      install (config.composer.markers), a Node install (node_modules; pnpm
+ *      or npm, detected from package.json like Krokedil CI — see pm.mjs), and
+ *      the plugin's JS build (config.build.markers, omitted for buildless plugins).
  *   3. For the persistent "start" mode, detect whether this worktree's site has
  *      ever been provisioned and, if not (or on --fresh/--reset), apply the dev
  *      blueprint via --reset. Warm boots run with no blueprint so data persists.
@@ -13,7 +14,7 @@
  *      (see blueprint/compose.mjs), resolve a free port, and spawn the packaged
  *      Playground CLI dependency.
  *
- * The pre-`pnpm install` chicken-and-egg (this file lives in node_modules) is
+ * The pre-install chicken-and-egg (this file lives in node_modules) is
  * owned by the per-plugin shim (src/init/templates/playground-shim.mjs), which
  * installs node_modules if missing and then imports "./cli".
  */
@@ -27,6 +28,7 @@ import process from 'node:process';
 
 import { composeAndStage } from './blueprint/compose.mjs';
 import { MODE_PORT_OFFSETS } from './config.mjs';
+import { PM_COMMANDS, detectPackageManager, execpathMatches } from './pm.mjs';
 import { resolvePort } from './port.mjs';
 
 /** Directory (relative to the plugin root) for generated blueprints/assets. */
@@ -203,7 +205,9 @@ function fail(msg) {
  * (warm boots / server / setup run on any Node). When the running Node is out
  * of range — e.g. preview_start launches us via npm, which ignores the .npmrc
  * pnpm pin — re-exec the entry script under pnpm's pinned Node 20 (.npmrc
- * use-node-version). If pnpm can't be used, abort with an actionable message.
+ * use-node-version). The repin only works under pnpm, so it's attempted only
+ * for pnpm-managed plugins (or when already running under pnpm, e.g. this
+ * repo's sandbox scripts); otherwise abort with an actionable message.
  *
  * @param {string} root Plugin root (cwd for the re-exec).
  */
@@ -211,8 +215,11 @@ export function ensureNodeForProvisioning(root) {
 	if (nodeSatisfiesPin(process.versions.node)) {
 		return;
 	}
+	const canRepin =
+		detectPackageManager(root) === 'pnpm' ||
+		execpathMatches('pnpm', process.env.npm_execpath);
 	// KROKEDIL_PG_REEXEC guards against a re-exec loop if pnpm doesn't repin.
-	if (process.env.KROKEDIL_PG_REEXEC !== '1') {
+	if (canRepin && process.env.KROKEDIL_PG_REEXEC !== '1') {
 		const res = spawnSync(
 			'pnpm',
 			['exec', 'node', process.argv[1], ...process.argv.slice(2)],
@@ -228,9 +235,11 @@ export function ensureNodeForProvisioning(root) {
 	}
 	fail(
 		`Node ${process.versions.node} can't provision: the Playground CLI's ` +
-			`--reset needs Node 20 (>=20.19.0 <21; it breaks on Node 22+). Run via ` +
-			`pnpm, which auto-pins Node 20 (.npmrc): "pnpm run playground:start" — ` +
-			`or "nvm use" first.`
+			`--reset needs Node 20 (>=20.19.0 <21; it breaks on Node 22+). ` +
+			(canRepin
+				? `Run via pnpm, which auto-pins Node 20 (.npmrc): ` +
+					`"pnpm run playground:start" — or "nvm use" first.`
+				: `Run "nvm use" (or "nvm install 20.19") first.`)
 	);
 }
 
@@ -254,34 +263,38 @@ export function isProvisioned(root) {
 }
 
 /**
- * Run a pnpm subcommand portably and return the spawn result (no hard fail).
+ * Run a package-manager subcommand portably and return the spawn result (no
+ * hard fail).
  *
- * `pnpm run <script>` sets npm_execpath to pnpm's JS entry; run it with the
- * current Node so we don't depend on a pnpm/pnpm.cmd shim on PATH.
+ * `<pm> run <script>` sets npm_execpath to the manager's JS entry; when it
+ * belongs to the requested manager, run it with the current Node so we don't
+ * depend on a pnpm/npm shim on PATH.
  *
- * @param {string}   root Plugin root.
- * @param {string[]} argv pnpm arguments (e.g. [ 'install' ]).
+ * @param {string}   root    Plugin root.
+ * @param {string}   manager 'pnpm' or 'npm' (see pm.mjs).
+ * @param {string[]} argv    Manager arguments (e.g. [ 'install' ]).
  * @return {Object} The spawnSync result.
  */
-function pnpmRun(root, argv) {
+function pmRun(root, manager, argv) {
 	const execpath = process.env.npm_execpath;
-	return execpath && /pnpm/.test(execpath)
+	return execpathMatches(manager, execpath)
 		? spawnSync(process.execPath, [execpath, ...argv], {
 				cwd: root,
 				stdio: 'inherit',
 			})
-		: spawnSync('pnpm', argv, { cwd: root, stdio: 'inherit' });
+		: spawnSync(manager, argv, { cwd: root, stdio: 'inherit' });
 }
 
 /**
- * Run a pnpm subcommand, aborting the bootstrap on failure.
+ * Run a package-manager subcommand, aborting the bootstrap on failure.
  *
- * @param {string}   root Plugin root.
- * @param {string[]} argv pnpm arguments.
- * @param {string}   what Human label used in the failure message.
+ * @param {string}   root    Plugin root.
+ * @param {string}   manager 'pnpm' or 'npm'.
+ * @param {string[]} argv    Manager arguments.
+ * @param {string}   what    Human label used in the failure message.
  */
-function pnpm(root, argv, what) {
-	const res = pnpmRun(root, argv);
+function pm(root, manager, argv, what) {
+	const res = pmRun(root, manager, argv);
 	if (res.error || res.status !== 0) {
 		fail(`${what} failed${res.error ? `: ${res.error.message}` : ''}.`);
 	}
@@ -320,7 +333,7 @@ export function ensurePrereqs(root, config, provisioning) {
 	}
 
 	// A configured build without package.json can never work — fail with a
-	// config-level message instead of a raw pnpm error further down.
+	// config-level message instead of a raw package-manager error further down.
 	if (config.build && !exists('package.json')) {
 		fail(
 			'playground.config.mjs declares "build" but the plugin has no package.json — remove "build" or add the JS tooling it expects.'
@@ -328,18 +341,26 @@ export function ensurePrereqs(root, config, provisioning) {
 	}
 
 	// No package.json means no Node dependencies to install (the sandbox
-	// plugin, or a consumer with no JS tooling at all).
-	if (exists('package.json') && !exists('node_modules')) {
-		log('installing Node dependencies (pnpm install)…');
-		// Prefer --frozen-lockfile (reproducible, matches CI, never rewrites the
-		// lock). If the committed lockfile is stale or broken, fall back to a
-		// normal install that repairs it, and say so rather than failing.
-		const frozen = pnpmRun(root, ['install', '--frozen-lockfile']);
-		if (frozen.error || frozen.status !== 0) {
+	// plugin, or a consumer with no JS tooling at all). The manager is
+	// detected from package.json's declaration, exactly like Krokedil CI
+	// (see pm.mjs): pnpm when declared, npm otherwise.
+	const manager = exists('package.json') ? detectPackageManager(root) : null;
+	if (manager && !exists('node_modules')) {
+		const commands = PM_COMMANDS[manager];
+		log(
+			`installing Node dependencies (${
+				manager === 'pnpm' ? 'pnpm install' : 'npm ci'
+			})…`
+		);
+		// Prefer the strict install (reproducible, matches CI, never rewrites
+		// the lock). If the committed lockfile is stale or broken, fall back to
+		// a normal install that repairs it, and say so rather than failing.
+		const strict = pmRun(root, manager, commands.install);
+		if (strict.error || strict.status !== 0) {
 			log(
-				'lockfile not usable as-is; running a normal install (pnpm-lock.yaml may be updated — consider committing it)…'
+				`lockfile not usable as-is; running a normal install (${commands.lockfile} may be updated — consider committing it)…`
 			);
-			pnpm(root, ['install', '--no-frozen-lockfile'], 'pnpm install');
+			pm(root, manager, commands.installFallback, `${manager} install`);
 		}
 	}
 
@@ -347,8 +368,8 @@ export function ensurePrereqs(root, config, provisioning) {
 		const built = config.build.markers.every(exists);
 		if (!built || provisioning) {
 			const script = config.build.command ?? 'build';
-			log(`building assets (pnpm run ${script})…`);
-			pnpm(root, ['run', script], `pnpm run ${script}`);
+			log(`building assets (${manager} run ${script})…`);
+			pm(root, manager, ['run', script], `${manager} run ${script}`);
 		}
 	}
 }

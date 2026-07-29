@@ -11,6 +11,8 @@ pnpm add -D "@krokedil/wp-playground-tools@github:krokedil/wp-playground-tools#s
 pnpm exec krokedil-playground init
 ```
 
+npm-managed plugins use npm the same way (`npm i -D …` and `npm exec krokedil-playground init` — npm supports the `#semver:` git spec too). The tool picks the plugin's package manager exactly like Krokedil CI: from `packageManager` (or `devEngines.packageManager`) in package.json — **pnpm iff declared, npm otherwise**; lockfile presence is intentionally ignored. That drives every install/build the tool runs (`pnpm install --frozen-lockfile` vs `npm ci`, with a lockfile-repairing fallback) and what `init` scaffolds.
+
 `init` scaffolds everything a plugin needs and is idempotent:
 
 | File | Owned by | Notes |
@@ -19,8 +21,8 @@ pnpm exec krokedil-playground init
 | `playground.config.mjs` | **the plugin** | the single per-plugin contract (schema below). Never overwritten. |
 | `.claude/launch.json` | generated | preview entries per mode, `autoPort: true`. |
 | `CLAUDE.md` | merged | a marker-delimited "WP Playground" section for Claude (commands, where the `--tunnel`/`--https` public URL lives, login, log/DB paths). Everything outside the markers is untouched. |
-| `package.json` | merged | `playground:*` scripts, this dev dependency, `engines` + Node pin. |
-| `.npmrc` / `.nvmrc` | generated | `use-node-version=20.19.0` — the Playground CLI's `--reset` breaks on Node 22+. |
+| `package.json` | merged | `playground:*` scripts, this dev dependency, `engines` + Node pin. `packageManager: pnpm@…` is stamped **only when init creates the file** — an existing package.json without the field is an npm plugin by the CI's detection rule, and stamping pnpm would flip its CI build. |
+| `.npmrc` / `.nvmrc` | generated | `use-node-version=20.19.0` — the Playground CLI's `--reset` breaks on Node 22+. `.npmrc` is written for pnpm plugins only (npm ignores the setting; npm plugins get `.nvmrc`). |
 | `.gitignore` / `.kernlignore` | appended | `.playground/` (generated blueprints + staged assets), `pr-screenshots/`. |
 
 Then:
@@ -29,7 +31,7 @@ Then:
 pnpm run playground:start
 ```
 
-On a fresh clone/worktree that one command installs composer + pnpm deps, builds assets (when configured), composes the blueprint, provisions the site, and boots it. Warm boots preserve data; `--fresh` reprovisions.
+On a fresh clone/worktree that one command installs composer + Node deps (pnpm or npm, per the detection above), builds assets (when configured), composes the blueprint, provisions the site, and boots it. Warm boots preserve data; `--fresh` reprovisions.
 
 ## Commands
 
@@ -45,7 +47,7 @@ pnpm exec krokedil-playground compose      # write the generated blueprints for 
 pnpm exec krokedil-playground init --update
 ```
 
-Pass-through Playground CLI flags work as usual: `--xdebug`, `--phpmyadmin`, `--php=8.2`, `--wp=6.8`, `--port=9999`. **Do not put a literal `--` separator in pnpm scripts or invocations** — pnpm forwards a literal `--` that the playground CLI drops.
+Pass-through Playground CLI flags work as usual: `--xdebug`, `--phpmyadmin`, `--php=8.2`, `--wp=6.8`, `--port=9999`. **Do not put a literal `--` separator in pnpm scripts or invocations** — pnpm forwards a literal `--` that the playground CLI drops. (npm is the opposite: npm plugins **must** use the separator, e.g. `npm run playground:start -- --fresh`.)
 
 Sites are isolated per checkout by `sha256(cwd)` under `~/.wordpress-playground/sites/`, and every mode auto-picks a free port (explicit `--port` > `PORT` env > probe from the mode default), so worktrees can run previews concurrently.
 

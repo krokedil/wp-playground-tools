@@ -9,8 +9,9 @@
  *   .claude/launch.json          preview entries per mode (generated)
  *   CLAUDE.md                    a marker-delimited playground section (generated;
  *                                everything outside the markers is preserved)
- *   package.json                 playground scripts, dev dep, engines, packageManager
- *   .npmrc / .nvmrc              the Node pin (generated)
+ *   package.json                 playground scripts, dev dep, engines
+ *                                (+ packageManager, fresh scaffolds only)
+ *   .npmrc / .nvmrc              the Node pin (.npmrc only for pnpm plugins)
  *   .gitignore / .kernlignore    .playground/ + pr-screenshots/ exclusions
  *
  * --update re-stamps the generated files (shim, launch.json, node pins,
@@ -22,6 +23,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { CONFIG_FILENAME, MODE_PORT_OFFSETS, loadConfig } from '../config.mjs';
+import { detectPackageManager } from '../pm.mjs';
 
 const TEMPLATES = fileURLToPath(new URL('./templates', import.meta.url));
 
@@ -133,6 +135,17 @@ export async function scaffold(root, args) {
 	const update = args.includes('--update');
 	const slug = inferSlug(root);
 
+	// The plugin's Node package manager, detected from the ORIGINAL
+	// package.json (before the merge below creates one), exactly like
+	// Krokedil CI (see pm.mjs): pnpm iff declared, npm otherwise. Fresh
+	// scaffolds get pnpm — init writes the package.json, so there is no
+	// lockfile or CI expectation to contradict. An existing undeclared
+	// package.json means CI builds with npm; stamping pnpm onto it would
+	// silently flip that (and break `pnpm install --frozen-lockfile` in CI,
+	// which has no pnpm-lock.yaml to work from).
+	const hadPkg = fs.existsSync(ownPkgPath);
+	const manager = hadPkg ? detectPackageManager(root) : 'pnpm';
+
 	// --- the shim (generated) ---
 	const shimDir = path.join(root, 'tools');
 	const shimPath = path.join(shimDir, 'playground.mjs');
@@ -168,27 +181,31 @@ export async function scaffold(root, args) {
 		fs.writeFileSync(nvmrc, NODE_PIN + '\n');
 		log('wrote .nvmrc');
 	}
-	const npmrc = path.join(root, '.npmrc');
-	const npmrcBody = fs.existsSync(npmrc)
-		? fs.readFileSync(npmrc, 'utf8')
-		: '';
-	if (/^use-node-version=/m.test(npmrcBody)) {
-		if (update) {
-			fs.writeFileSync(
-				npmrc,
-				npmrcBody.replace(
-					/^use-node-version=.*$/m,
-					`use-node-version=${NODE_PIN}`
-				)
-			);
-			log('updated .npmrc node pin');
+	// use-node-version is a pnpm-only setting — npm ignores it, so npm
+	// plugins get only .nvmrc (never delete an existing line, though).
+	if (manager === 'pnpm') {
+		const npmrc = path.join(root, '.npmrc');
+		const npmrcBody = fs.existsSync(npmrc)
+			? fs.readFileSync(npmrc, 'utf8')
+			: '';
+		if (/^use-node-version=/m.test(npmrcBody)) {
+			if (update) {
+				fs.writeFileSync(
+					npmrc,
+					npmrcBody.replace(
+						/^use-node-version=.*$/m,
+						`use-node-version=${NODE_PIN}`
+					)
+				);
+				log('updated .npmrc node pin');
+			}
+		} else {
+			ensureLines(npmrc, [
+				"# pnpm downloads/uses this Node for every run (the Playground CLI's --reset path breaks on Node 22+).",
+				`use-node-version=${NODE_PIN}`,
+			]);
+			log('pinned Node in .npmrc');
 		}
-	} else {
-		ensureLines(npmrc, [
-			"# pnpm downloads/uses this Node for every run (the Playground CLI's --reset path breaks on Node 22+).",
-			`use-node-version=${NODE_PIN}`,
-		]);
-		log('pinned Node in .npmrc');
 	}
 
 	// --- package.json (merged) ---
@@ -232,13 +249,21 @@ export async function scaffold(root, args) {
 	pkg.engines = {
 		...(pkg.engines ?? {}),
 		node: `>=${NODE_PIN} <21`,
-		pnpm: pkg.engines?.pnpm ?? '>=9.13.0',
 	};
-	pkg.packageManager = pkg.packageManager ?? 'pnpm@9.15.9';
+	if (manager === 'pnpm') {
+		pkg.engines.pnpm = pkg.engines?.pnpm ?? '>=9.13.0';
+		// Declare the manager only on package.json files init created itself.
+		// An existing file without the field is an npm plugin by the CI's
+		// detection rule — and a pnpm plugin already carries its own
+		// declaration (packageManager or devEngines).
+		if (!hadPkg) {
+			pkg.packageManager = pkg.packageManager ?? 'pnpm@9.15.9';
+		}
+	}
 	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
 	if (scriptsChanged) {
 		log(
-			'merged package.json (scripts, dev dependency, engines) — run pnpm install'
+			`merged package.json (scripts, dev dependency, engines) — run ${manager} install`
 		);
 	}
 
@@ -253,7 +278,7 @@ export async function scaffold(root, args) {
 	for (const mode of modes) {
 		launch.configurations.push({
 			name: `playground-${slug}-${mode}`,
-			runtimeExecutable: 'pnpm',
+			runtimeExecutable: manager,
 			runtimeArgs: ['run', MODE_SCRIPTS[mode][0]],
 			port: basePort + MODE_PORT_OFFSETS[mode],
 			autoPort: true,
@@ -271,6 +296,17 @@ export async function scaffold(root, args) {
 		'\n' +
 		fs
 			.readFileSync(path.join(TEMPLATES, 'claude-md-section.md'), 'utf8')
+			.replaceAll('__PM__', manager)
+			.replaceAll(
+				'__PM_EXEC__',
+				manager === 'pnpm' ? 'pnpm exec' : 'npm exec'
+			)
+			.replaceAll(
+				'__FLAGS_NOTE__',
+				manager === 'pnpm'
+					? 'Extra flags pass straight through: `--xdebug`, `--phpmyadmin`, `--php=8.2`, `--wp=6.8` (never insert a literal `--` separator)'
+					: 'Forward extra flags after a `--` separator (npm requires it): `npm run playground:start -- --xdebug` (also `--phpmyadmin`, `--php=8.2`, `--wp=6.8`)'
+			)
 			.replaceAll('__START_PORT__', String(basePort))
 			.replaceAll(
 				'__DEV_PORT__',
@@ -336,6 +372,6 @@ export async function scaffold(root, args) {
 	log(
 		update
 			? 'refresh complete.'
-			: `scaffold complete — review ${CONFIG_FILENAME}, then: pnpm install && pnpm run playground:start`
+			: `scaffold complete — review ${CONFIG_FILENAME}, then: ${manager} install && ${manager} run playground:start`
 	);
 }

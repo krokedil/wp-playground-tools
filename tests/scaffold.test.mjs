@@ -226,6 +226,117 @@ test('scaffold --update prunes dropped-mode scripts but keeps customized ones', 
 	);
 });
 
+test('fresh scaffold (no package.json) defaults to pnpm and declares it', async (t) => {
+	const root = makePluginRoot(t);
+	await scaffold(root, []);
+
+	const pkg = JSON.parse(
+		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
+	);
+	assert.equal(pkg.packageManager, 'pnpm@9.15.9');
+	assert.equal(pkg.engines.pnpm, '>=9.13.0');
+	assert.match(
+		fs.readFileSync(path.join(root, '.npmrc'), 'utf8'),
+		/use-node-version=/
+	);
+
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	assert.ok(
+		launch.configurations.every((c) => c.runtimeExecutable === 'pnpm')
+	);
+
+	const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
+	assert.match(claude, /pnpm run playground:start/);
+	assert.match(claude, /never insert a literal `--` separator/);
+	assert.match(claude, /pnpm exec krokedil-playground compose/);
+	assert.doesNotMatch(claude, /__PM__|__PM_EXEC__|__FLAGS_NOTE__/);
+});
+
+test('scaffold treats an undeclared package.json as npm (CI detection)', async (t) => {
+	const root = makePluginRoot(t);
+	fs.writeFileSync(
+		path.join(root, 'package.json'),
+		JSON.stringify({ name: 'my-payment-gateway', version: '1.0.0' })
+	);
+	await scaffold(root, []);
+
+	const pkg = JSON.parse(
+		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
+	);
+	// No packageManager stamp — its absence is what makes CI build with npm.
+	assert.equal(pkg.packageManager, undefined);
+	assert.equal(pkg.engines.pnpm, undefined);
+	assert.match(pkg.engines.node, /^>=20\.19/);
+	// use-node-version is pnpm-only; npm plugins get just .nvmrc.
+	assert.ok(!fs.existsSync(path.join(root, '.npmrc')));
+	assert.ok(fs.existsSync(path.join(root, '.nvmrc')));
+
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	assert.ok(
+		launch.configurations.every((c) => c.runtimeExecutable === 'npm')
+	);
+
+	const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
+	assert.match(claude, /npm run playground:start/);
+	assert.match(claude, /playground:start -- --xdebug/);
+	assert.match(claude, /npm exec krokedil-playground compose/);
+	assert.doesNotMatch(claude, /__PM__|__PM_EXEC__|__FLAGS_NOTE__/);
+});
+
+test('scaffold treats a yarn declaration as npm and preserves it', async (t) => {
+	const root = makePluginRoot(t);
+	fs.writeFileSync(
+		path.join(root, 'package.json'),
+		JSON.stringify({ name: 'x', packageManager: 'yarn@4.0.0' })
+	);
+	await scaffold(root, []);
+
+	const pkg = JSON.parse(
+		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
+	);
+	assert.equal(pkg.packageManager, 'yarn@4.0.0');
+	assert.equal(pkg.engines.pnpm, undefined);
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	assert.ok(
+		launch.configurations.every((c) => c.runtimeExecutable === 'npm')
+	);
+});
+
+test('scaffold keeps pnpm treatment for declared pnpm plugins without re-stamping', async (t) => {
+	const root = makePluginRoot(t);
+	fs.writeFileSync(
+		path.join(root, 'package.json'),
+		JSON.stringify({
+			name: 'x',
+			devEngines: { packageManager: { name: 'pnpm', version: '9' } },
+		})
+	);
+	await scaffold(root, []);
+
+	const pkg = JSON.parse(
+		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
+	);
+	// pnpm via devEngines: pnpm treatment, but no redundant second declaration.
+	assert.equal(pkg.packageManager, undefined);
+	assert.equal(pkg.engines.pnpm, '>=9.13.0');
+	assert.match(
+		fs.readFileSync(path.join(root, '.npmrc'), 'utf8'),
+		/use-node-version=/
+	);
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	assert.ok(
+		launch.configurations.every((c) => c.runtimeExecutable === 'pnpm')
+	);
+});
+
 test('scaffold --update respects a custom basePort from the config', async (t) => {
 	const root = makePluginRoot(t);
 	await scaffold(root, []);

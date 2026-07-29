@@ -32,7 +32,7 @@
  *        KROKEDIL_PG_KEEP_SHOTS, KROKEDIL_PG_KEEP_COLLAGES
  *
  * Requires the optional @playwright/test peer dep and a one-time
- * `pnpm exec playwright install chromium`.
+ * `pnpm exec playwright install chromium` (npm: `npx playwright install chromium`).
  */
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -77,7 +77,7 @@ async function loadChromium(root) {
 	} catch {
 		throw new Error(
 			"screenshots need @playwright/test — add it to the plugin's devDependencies " +
-				'and run `pnpm exec playwright install chromium`.'
+				'and run `pnpm exec playwright install chromium` (npm: `npx playwright install chromium`).'
 		);
 	}
 }
