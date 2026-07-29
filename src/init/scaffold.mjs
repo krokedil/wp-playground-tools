@@ -36,8 +36,21 @@ const MODE_SCRIPTS = {
 	e2e: ['playground:server-e2e', 'node tools/playground.mjs server e2e'],
 };
 
-/** The Node version pin stamped into consumers (kept next to nodeSatisfiesPin). */
-export const NODE_PIN = '20.19.0';
+/**
+ * The Node version pin stamped into consumers' .nvmrc/.npmrc. Must satisfy
+ * nodeSatisfiesPin() in src/prepare.mjs — keep the two in sync.
+ */
+export const NODE_PIN = '22.23.2';
+
+/**
+ * The minimum Node written into consumers' engines. Must equal the floor
+ * enforced by nodeSatisfiesPin() in src/prepare.mjs — keep the two in sync.
+ */
+export const NODE_FLOOR = '20.19.0';
+
+/** Comment written above the use-node-version pin in consumers' .npmrc. */
+const NPMRC_PIN_COMMENT =
+	'# pnpm downloads/uses this Node for every run, so playground runs are reproducible across machines.';
 
 /** The dependency spec written into consumers' package.json. */
 export const PACKAGE_SPEC = 'github:krokedil/wp-playground-tools#semver:^1';
@@ -188,18 +201,21 @@ export async function scaffold(root, args) {
 		if (update) {
 			fs.writeFileSync(
 				npmrc,
-				npmrcBody.replace(
-					/^use-node-version=.*$/m,
-					`use-node-version=${NODE_PIN}`
-				)
+				npmrcBody
+					.replace(
+						/^use-node-version=.*$/m,
+						`use-node-version=${NODE_PIN}`
+					)
+					// Drop the pre-1.2.0 rationale (upstream fixed --reset on Node 22+).
+					.replace(
+						/^# pnpm downloads\/uses this Node for every run \(the Playground CLI's --reset path breaks on Node 22\+\)\.$/m,
+						NPMRC_PIN_COMMENT
+					)
 			);
 			log('updated .npmrc node pin');
 		}
 	} else {
-		ensureLines(npmrc, [
-			"# pnpm downloads/uses this Node for every run (the Playground CLI's --reset path breaks on Node 22+).",
-			`use-node-version=${NODE_PIN}`,
-		]);
+		ensureLines(npmrc, [NPMRC_PIN_COMMENT, `use-node-version=${NODE_PIN}`]);
 		log('pinned Node in .npmrc');
 	}
 
@@ -261,7 +277,7 @@ export async function scaffold(root, args) {
 	}
 	pkg.engines = {
 		...(pkg.engines ?? {}),
-		node: `>=${NODE_PIN} <21`,
+		node: `>=${NODE_FLOOR}`,
 		pnpm: pkg.engines?.pnpm ?? '>=9.13.0',
 	};
 	pkg.packageManager = pkg.packageManager ?? 'pnpm@9.15.9';

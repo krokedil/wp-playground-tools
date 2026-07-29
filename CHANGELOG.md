@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
+  crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),
+  shipped in 3.1.36), so the Node `<21` ceiling is gone.
+- Node handling: `engines.node` relaxed to `>=20.19.0` (here and in scaffolded
+  consumers); the `.nvmrc`/`.npmrc` pin moves from 20.19.0 (EOL) to 22.23.2
+  (22 LTS). `init --update` rewrites an existing `use-node-version` pin and
+  drops the stale "breaks on Node 22+" comment; the provisioning-time Node
+  guard now only enforces the floor.
 - Fix: `init` now restores the `#semver:^1` range on the dev dependency spec
   when `pnpm add` saved it as a bare branch-tracking git URL (pnpm normalizes
   the spec on save — all versions, 9 through 11). Deliberate `#committish`
