@@ -36,10 +36,16 @@ const MODE_SCRIPTS = {
 	e2e: ['playground:server-e2e', 'node tools/playground.mjs server e2e'],
 };
 
-/** The Node version pin stamped into consumers (kept next to nodeSatisfiesPin). */
+/**
+ * The Node version pin stamped into consumers' .nvmrc/.npmrc. Must satisfy
+ * nodeSatisfiesPin() in src/prepare.mjs — keep the two in sync.
+ */
 export const NODE_PIN = '22.23.2';
 
-/** The minimum Node written into consumers' engines (matches nodeSatisfiesPin). */
+/**
+ * The minimum Node written into consumers' engines. Must equal the floor
+ * enforced by nodeSatisfiesPin() in src/prepare.mjs — keep the two in sync.
+ */
 export const NODE_FLOOR = '20.19.0';
 
 /** Comment written above the use-node-version pin in consumers' .npmrc. */

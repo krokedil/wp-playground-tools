@@ -23,7 +23,7 @@ pnpm install
 | `.claude/launch.json` | generated | preview entries per mode, `autoPort: true`. |
 | `CLAUDE.md` | merged | a marker-delimited "WP Playground" section for Claude (commands, where the `--tunnel`/`--https` public URL lives, login, log/DB paths). Everything outside the markers is untouched. |
 | `package.json` | merged | `playground:*` scripts, this dev dependency, `engines` + Node pin. |
-| `.npmrc` / `.nvmrc` | generated | `use-node-version=22.23.2` — pnpm downloads/uses a known-good Node LTS for every run. |
+| `.npmrc` / `.nvmrc` | generated | Pin Node 22 LTS: `.npmrc` sets `use-node-version=22.23.2` (pnpm downloads/uses it for every run); `.nvmrc` holds the bare version for nvm. |
 | `.gitignore` / `.kernlignore` | appended | `.playground/` (generated blueprints + staged assets), `pr-screenshots/`. |
 
 Then:
