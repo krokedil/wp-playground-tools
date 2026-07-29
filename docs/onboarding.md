@@ -4,7 +4,7 @@ Step-by-step guide for adopting `@krokedil/wp-playground-tools` in a plugin repo
 
 ## 0. Prerequisites
 
-- **pnpm >= 9.13** and git. Node is handled for you: `init` pins `use-node-version=20.19.0` in `.npmrc`, so pnpm downloads and uses the right Node automatically.
+- **pnpm >= 9.13** and git. Node is handled for you: `init` pins `use-node-version=22.23.2` in `.npmrc`, so pnpm downloads and uses the right Node automatically.
 - The plugin's main PHP file carries a `Plugin Name:` header at the repo root — `init` infers the slug from it (falls back to the directory name).
 - The install spec `#semver:^1` resolves against this repo's `vX.Y.Z` git tags; new releases are picked up with `pnpm update`.
 

@@ -30,7 +30,7 @@ pnpm run sandbox:start   # persistent, worktree-isolated site on :9880
 
 ## Invariants / gotchas
 
-- **Node pin `>=20.19 <21`** (`.nvmrc`, `.npmrc`): the Playground CLI's `--reset` breaks on Node 22+. `prepare.mjs` re-execs via pnpm for provisioning runs.
+- **Node floor `>=20.19`** (engines; `.nvmrc`/`.npmrc` pin 22 LTS for reproducibility): the old `<21` ceiling — the CLI's `--reset` crashed on Node 22+ — was fixed upstream in `@wp-playground/cli` 3.1.36 ([#3695](https://github.com/WordPress/wordpress-playground/pull/3695)). `prepare.mjs` still re-execs via pnpm when a provisioning run starts on a too-old Node.
 - **Ports**: mode port = `basePort` + `{start: 0, development: 1, demo: 2, e2e: 3}`; the local https listener is the http port **+400**. Port precedence: explicit `--port` > `PORT` env > probe. The sandbox owns basePort 9880 (see the README port registry).
 - **Proxy mechanism**: the public URL is written to `.playground/proxy-url.txt`; the always-staged `playground-proxy-url.php` mu-plugin filters `home`/`siteurl` at runtime — no DB writes, and the file is cleared on every non-proxied launch.
 - **Site persistence**: sites are keyed by `sha256(cwd)` under `~/.wordpress-playground/sites/` — worktrees get isolated sites automatically.

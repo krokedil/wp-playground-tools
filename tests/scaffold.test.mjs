@@ -58,11 +58,11 @@ test('scaffold writes shim, config, pins, scripts, launch entries and ignores', 
 
 	assert.equal(
 		fs.readFileSync(path.join(root, '.nvmrc'), 'utf8').trim(),
-		'20.19.0'
+		'22.23.2'
 	);
 	assert.match(
 		fs.readFileSync(path.join(root, '.npmrc'), 'utf8'),
-		/use-node-version=20\.19\.0/
+		/use-node-version=22\.23\.2/
 	);
 
 	const pkg = JSON.parse(

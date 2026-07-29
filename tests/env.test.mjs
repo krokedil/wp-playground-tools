@@ -82,10 +82,12 @@ test('applyEnvFile strips a leading BOM', (t) => {
 	assert.equal(env.FIRST, '1');
 });
 
-test('applyEnvFile warns on malformed lines without echoing their content', (t) => {
+test('applyEnvFile never echoes a malformed line', (t) => {
 	const captured = captureStderr(t);
-	// On Node 20 parseEnv glues a line without "=" into the next line's key,
-	// so SWALLOWED is lost — the warning is the only signal.
+	// parseEnv differs by Node version: Node 20 glues a line without "=" into
+	// the next line's key (SWALLOWED is lost and the warning is the only
+	// signal); Node 22+ drops the bare line and parses SWALLOWED normally.
+	// Either way the pasted secret must never reach stderr.
 	const root = makeRoot(
 		t,
 		'OK=1\nsk_live_pasted_secret_no_equals\nSWALLOWED=2\n'
@@ -95,8 +97,10 @@ test('applyEnvFile warns on malformed lines without echoing their content', (t) 
 
 	assert.equal(env.OK, '1');
 	const output = captured();
-	assert.match(output, /malformed line/);
 	assert.ok(!output.includes('sk_live_pasted_secret_no_equals'));
+	if (env.SWALLOWED !== '2') {
+		assert.match(output, /malformed line/);
+	}
 });
 
 test('applyEnvFile falls back to the main checkout .env from a linked worktree', (t) => {
