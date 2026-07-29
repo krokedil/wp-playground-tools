@@ -319,7 +319,17 @@ export function ensurePrereqs(root, config, provisioning) {
 		}
 	}
 
-	if (!exists('node_modules')) {
+	// A configured build without package.json can never work — fail with a
+	// config-level message instead of a raw pnpm error further down.
+	if (config.build && !exists('package.json')) {
+		fail(
+			'playground.config.mjs declares "build" but the plugin has no package.json — remove "build" or add the JS tooling it expects.'
+		);
+	}
+
+	// No package.json means no Node dependencies to install (the sandbox
+	// plugin, or a consumer with no JS tooling at all).
+	if (exists('package.json') && !exists('node_modules')) {
 		log('installing Node dependencies (pnpm install)…');
 		// Prefer --frozen-lockfile (reproducible, matches CI, never rewrites the
 		// lock). If the committed lockfile is stale or broken, fall back to a

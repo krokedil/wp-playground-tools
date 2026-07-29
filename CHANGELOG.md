@@ -1,6 +1,28 @@
 # Changelog
 
-## 1.0.0 — unreleased
+## Unreleased
+
+- Standalone dogfooding: committed `sandbox/` plugin + config, `sandbox:*`
+  scripts (http / https / ngrok / persistent start on basePort 9880) and
+  `.claude/launch.json` preview entries — no consumer repo needed. The sandbox
+  dashboard widget and `GET /wp-json/krokedil-sandbox/v1/ping` echo transport
+  diagnostics.
+- `init` refuses to run inside this package itself (it would inject a
+  self-referential git dependency and rewrite the repo's own files).
+- `init` maintains a marker-delimited "WP Playground" section in the
+  consumer's `CLAUDE.md` (commands, where the `--tunnel`/`--https` public URL
+  lives, login, log/DB paths) so Claude sessions in plugin repos know the
+  workflow; everything outside the markers is preserved.
+- `ensurePrereqs` skips `pnpm install` for roots without a `package.json`,
+  and fails actionably when `build` is configured without one.
+- Dev tooling: `CLAUDE.md`, prettier (`format`/`format:check`,
+  `@wordpress/prettier-config`), `.editorconfig`, `lint:fix`, and `php -l`
+  over all shipped PHP in CI.
+- CI: fixed the smoke job's pnpm setup (the subdirectory checkout hid the
+  `packageManager` field from `pnpm/action-setup`) — the job now actually
+  boots the fixture plugin.
+
+## 1.0.0 — 2026-07-29
 
 Initial release, extracted from returns-and-withdrawals' `tools/` setup.
 
