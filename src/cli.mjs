@@ -13,13 +13,15 @@
  * Cross-cutting flags for start/server:
  *   --fresh     reprovision the persistent site (start only)
  *   --tunnel    expose the site over https via ngrok (public URL, webhooks)
+ *   --tunnel-domain=<host|none>  per-run tunnel domain override (implies
+ *               --tunnel; 'none' forces an ephemeral URL — parallel worktrees)
  *   --https     serve https locally via mkcert + reverse proxy (no tunnel)
  * Everything else is forwarded to the Playground CLI (--xdebug, --php=…, …).
  */
 import process from 'node:process';
 
 import { composeAndStage } from './blueprint/compose.mjs';
-import { loadConfig } from './config.mjs';
+import { loadConfig, validateTunnelDomain } from './config.mjs';
 import { launch, log } from './prepare.mjs';
 import { clearProxyUrl } from './proxy/tunnel.mjs';
 
@@ -88,7 +90,13 @@ export async function main(argv = process.argv.slice(2)) {
  * @param {string[]} args     User args (ours + forwarded).
  */
 async function runMode(root, modeName, args) {
-	const wantsTunnel = args.includes('--tunnel');
+	// --tunnel-domain=<host|none> overrides config.tunnel.domain for this run
+	// (parallel worktrees share the committed config) and implies --tunnel.
+	const domainArg = args.find((a) => a.startsWith('--tunnel-domain='));
+	const tunnelDomain = domainArg
+		? domainArg.slice('--tunnel-domain='.length)
+		: null;
+	const wantsTunnel = args.includes('--tunnel') || tunnelDomain !== null;
 	const wantsHttps = args.includes('--https');
 	if (wantsTunnel && wantsHttps) {
 		process.stderr.write(
@@ -97,7 +105,21 @@ async function runMode(root, modeName, args) {
 		process.exitCode = 1;
 		return;
 	}
-	const forwarded = args.filter((a) => a !== '--tunnel' && a !== '--https');
+	if (tunnelDomain !== null && tunnelDomain !== 'none') {
+		try {
+			validateTunnelDomain(tunnelDomain, '--tunnel-domain');
+		} catch (err) {
+			process.stderr.write(`✖ playground: ${err.message}\n`);
+			process.exitCode = 1;
+			return;
+		}
+	}
+	const forwarded = args.filter(
+		(a) =>
+			a !== '--tunnel' &&
+			a !== '--https' &&
+			!a.startsWith('--tunnel-domain=')
+	);
 
 	const config = await loadConfig(root);
 
@@ -126,6 +148,7 @@ async function runMode(root, modeName, args) {
 			proxy = await startProxy(root, config, {
 				port: handle.port,
 				kind: wantsTunnel ? 'tunnel' : 'https',
+				tunnelDomain,
 			});
 		} catch (err) {
 			process.stderr.write(`✖ playground: ${err.message}\n`);

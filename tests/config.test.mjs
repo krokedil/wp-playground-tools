@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeConfig } from '../src/config.mjs';
+import { normalizeConfig, validateTunnelDomain } from '../src/config.mjs';
 
 test('slug is required and validated', () => {
 	assert.throws(() => normalizeConfig({}), /"slug" is required/);
@@ -85,6 +85,46 @@ test('unsupported tunnel provider is rejected', () => {
 		tunnel: { provider: 'ngrok', domain: 'x.eu.ngrok.io' },
 	});
 	assert.equal(config.tunnel.domain, 'x.eu.ngrok.io');
+});
+
+test('tunnel.domain must be a bare hostname', () => {
+	for (const bad of [
+		'https://x.eu.ngrok.io',
+		'x.eu.ngrok.io/path',
+		'x.eu.ngrok.io:443',
+		'not a host',
+		123,
+		'',
+	]) {
+		assert.throws(
+			() =>
+				normalizeConfig({
+					slug: 'a-plugin',
+					tunnel: { provider: 'ngrok', domain: bad },
+				}),
+			/bare hostname/,
+			`expected rejection for ${JSON.stringify(bad)}`
+		);
+	}
+
+	// No domain at all stays valid (ephemeral URLs).
+	const config = normalizeConfig({
+		slug: 'a-plugin',
+		tunnel: { provider: 'ngrok' },
+	});
+	assert.equal(config.tunnel.domain, undefined);
+});
+
+test('validateTunnelDomain accepts hostnames and names the failing setting', () => {
+	assert.equal(
+		validateTunnelDomain('my-plugin.eu.ngrok.io'),
+		'my-plugin.eu.ngrok.io'
+	);
+	assert.equal(validateTunnelDomain('a-b.ngrok.app'), 'a-b.ngrok.app');
+	assert.throws(
+		() => validateTunnelDomain('nodots', '--tunnel-domain'),
+		/"--tunnel-domain" must be a bare hostname/
+	);
 });
 
 test('store overrides merge over org defaults', () => {

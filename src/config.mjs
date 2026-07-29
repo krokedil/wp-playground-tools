@@ -47,6 +47,29 @@ function fail(message) {
 }
 
 /**
+ * Validate a tunnel domain: a bare hostname (no scheme, path, port or spaces).
+ *
+ * Shared by config validation and the CLI's --tunnel-domain override so both
+ * reject the same shapes with the same message. Throws a bare Error; callers
+ * add their own context prefix (config validation wraps it via fail()).
+ *
+ * @param {*}      domain The raw domain value.
+ * @param {string} [name] Setting name for the error message.
+ * @return {string} The validated domain.
+ */
+export function validateTunnelDomain(domain, name = 'tunnel.domain') {
+	const hostname =
+		/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+	if (typeof domain !== 'string' || !hostname.test(domain)) {
+		throw new Error(
+			`"${name}" must be a bare hostname like "my-plugin.eu.ngrok.io" ` +
+				`(no https://, path or port), got ${JSON.stringify(domain)}.`
+		);
+	}
+	return domain;
+}
+
+/**
  * Normalize a per-mode setting to a { development, demo, e2e } map.
  *
  * Accepts: nothing (empty map), an array/plain value applied to every mode, or
@@ -155,6 +178,13 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 		fail(
 			`unsupported tunnel provider "${raw.tunnel.provider}" — only "ngrok" is available today.`
 		);
+	}
+	if (raw.tunnel?.domain !== undefined) {
+		try {
+			validateTunnelDomain(raw.tunnel.domain);
+		} catch (err) {
+			fail(err.message);
+		}
 	}
 
 	const activate = raw.activate ?? [raw.slug];
