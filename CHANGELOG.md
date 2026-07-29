@@ -9,6 +9,10 @@
   diagnostics.
 - `init` refuses to run inside this package itself (it would inject a
   self-referential git dependency and rewrite the repo's own files).
+- `init` maintains a marker-delimited "WP Playground" section in the
+  consumer's `CLAUDE.md` (commands, where the `--tunnel`/`--https` public URL
+  lives, login, log/DB paths) so Claude sessions in plugin repos know the
+  workflow; everything outside the markers is preserved.
 - `ensurePrereqs` skips `pnpm install` for roots without a `package.json`,
   and fails actionably when `build` is configured without one.
 - Dev tooling: `CLAUDE.md`, prettier (`format`/`format:check`,

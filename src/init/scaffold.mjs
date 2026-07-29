@@ -7,6 +7,8 @@
  *   tools/playground.mjs         the bootstrap shim (generated — refreshed by --update)
  *   playground.config.mjs        starter config (never touched once it exists)
  *   .claude/launch.json          preview entries per mode (generated)
+ *   CLAUDE.md                    a marker-delimited playground section (generated;
+ *                                everything outside the markers is preserved)
  *   package.json                 playground scripts, dev dep, engines, packageManager
  *   .npmrc / .nvmrc              the Node pin (generated)
  *   .gitignore / .kernlignore    .playground/ + pr-screenshots/ exclusions
@@ -28,6 +30,10 @@ export const NODE_PIN = '20.19.0';
 
 /** The dependency spec written into consumers' package.json. */
 export const PACKAGE_SPEC = 'github:krokedil/wp-playground-tools#semver:^1';
+
+/** Markers delimiting the generated section in a consumer's CLAUDE.md. */
+export const CLAUDE_MD_BEGIN = '<!-- BEGIN @krokedil/wp-playground-tools -->';
+export const CLAUDE_MD_END = '<!-- END @krokedil/wp-playground-tools -->';
 
 /**
  * Emit a scaffold progress line.
@@ -240,6 +246,52 @@ export async function scaffold(root, args) {
 	fs.mkdirSync(path.dirname(launchPath), { recursive: true });
 	fs.writeFileSync(launchPath, JSON.stringify(launch, null, '\t') + '\n');
 	log('wrote .claude/launch.json preview entries');
+
+	// --- CLAUDE.md section (generated between markers, rest preserved) ---
+	// Gives Claude in the plugin repo the playground essentials — commands,
+	// where the tunnel/https public URL lives, login, log/DB paths.
+	const section =
+		CLAUDE_MD_BEGIN +
+		'\n' +
+		fs
+			.readFileSync(path.join(TEMPLATES, 'claude-md-section.md'), 'utf8')
+			.replaceAll('__START_PORT__', String(basePort))
+			.replaceAll(
+				'__DEV_PORT__',
+				String(basePort + MODE_PORT_OFFSETS.development)
+			)
+			.replaceAll(
+				'__DEMO_PORT__',
+				String(basePort + MODE_PORT_OFFSETS.demo)
+			)
+			.trim() +
+		'\n' +
+		CLAUDE_MD_END;
+	const claudePath = path.join(root, 'CLAUDE.md');
+	const claudeBody = fs.existsSync(claudePath)
+		? fs.readFileSync(claudePath, 'utf8')
+		: '';
+	const beginAt = claudeBody.indexOf(CLAUDE_MD_BEGIN);
+	const endAt = claudeBody.indexOf(CLAUDE_MD_END);
+	if (beginAt !== -1 && endAt > beginAt) {
+		fs.writeFileSync(
+			claudePath,
+			claudeBody.slice(0, beginAt) +
+				section +
+				claudeBody.slice(endAt + CLAUDE_MD_END.length)
+		);
+		log('refreshed the WP Playground section in CLAUDE.md');
+	} else {
+		const glue = claudeBody
+			? (claudeBody.endsWith('\n') ? '' : '\n') + '\n'
+			: '';
+		fs.writeFileSync(claudePath, claudeBody + glue + section + '\n');
+		log(
+			claudeBody
+				? 'appended the WP Playground section to CLAUDE.md'
+				: 'wrote CLAUDE.md (WP Playground section)'
+		);
+	}
 
 	// --- ignores ---
 	if (

@@ -16,6 +16,7 @@ pnpm exec krokedil-playground init
 | `tools/playground.mjs` | generated | bootstrap shim (Node built-ins only; installs `node_modules` when missing, then hands over to the package). Refresh with `init --update`. |
 | `playground.config.mjs` | **the plugin** | the single per-plugin contract (schema below). Never overwritten. |
 | `.claude/launch.json` | generated | preview entries per mode, `autoPort: true`. |
+| `CLAUDE.md` | merged | a marker-delimited "WP Playground" section for Claude (commands, where the `--tunnel`/`--https` public URL lives, login, log/DB paths). Everything outside the markers is untouched. |
 | `package.json` | merged | `playground:*` scripts, this dev dependency, `engines` + Node pin. |
 | `.npmrc` / `.nvmrc` | generated | `use-node-version=20.19.0` — the Playground CLI's `--reset` breaks on Node 22+. |
 | `.gitignore` / `.kernlignore` | appended | `.playground/` (generated blueprints + staged assets), `pr-screenshots/`. |
