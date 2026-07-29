@@ -131,6 +131,44 @@ test('applyEnvFile ignores an unparseable .git file', (t) => {
 	assert.deepEqual(result.applied, ['A']);
 });
 
+test('applyEnvFile applies names shadowing Object.prototype members', (t) => {
+	captureStderr(t);
+	const env = {};
+	// `name in env` would see the inherited toString and silently skip it.
+	applyEnvFile(makeRoot(t, 'toString=shadowed\n'), { env });
+	assert.equal(env.toString, 'shadowed');
+});
+
+test('applyEnvFile rejects reserved names, naming them', (t) => {
+	const captured = captureStderr(t);
+	const env = {};
+	const result = applyEnvFile(makeRoot(t, 'prototype=evil\nSAFE=1\n'), {
+		env,
+	});
+	assert.equal(env.SAFE, '1');
+	assert.deepEqual(result.applied, ['SAFE']);
+	assert.ok(!Object.hasOwn(env, 'prototype'));
+	assert.match(captured(), /reserved variable name "prototype"/);
+});
+
+test('applyEnvFile never pollutes the prototype via __proto__', (t) => {
+	captureStderr(t);
+	const env = {};
+	// parseEnv drops __proto__ itself on some Node versions and surfaces it
+	// on others — either way it must not reach the prototype link.
+	applyEnvFile(makeRoot(t, '__proto__=evil\nSAFE=1\n'), { env });
+	assert.equal(env.SAFE, '1');
+	assert.equal(Object.getPrototypeOf(env), Object.prototype);
+	assert.ok(!Object.hasOwn(env, '__proto__'));
+});
+
+test('envSecret ignores inherited properties', (t) => {
+	const captured = captureStderr(t);
+	// env.constructor exists on the prototype chain but is not an env var.
+	assert.equal(envSecret('constructor', { env: {} }), undefined);
+	assert.match(captured(), /constructor is not set/);
+});
+
 test('envSecret returns set values and treats unset/empty as missing', (t) => {
 	const captured = captureStderr(t);
 	const env = { PG_SET: 'value-123', PG_EMPTY: '' };

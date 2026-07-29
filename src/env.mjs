@@ -15,6 +15,14 @@ import { parseEnv } from 'node:util';
  */
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * Names that collide with Object.prototype machinery. Assigning __proto__ on
+ * a plain object mutates the prototype link instead of creating a property
+ * (and parseEnv only filters it out on some Node versions), so these are
+ * rejected outright — nobody names a real env var after them.
+ */
+const RESERVED_NAMES = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** Secrets already warned about, so each name warns once per process. */
 const warnedNames = new Set();
 
@@ -108,7 +116,14 @@ export function applyEnvFile(root, { env = process.env } = {}) {
 				malformed = true;
 				continue;
 			}
-			if (name in env) {
+			if (RESERVED_NAMES.has(name)) {
+				// The name isn't secret content, so it's safe to print.
+				warn(`skipping reserved variable name "${name}" in .env`);
+				continue;
+			}
+			// Own properties only: `in` would treat names shadowing
+			// Object.prototype members (toString, …) as already set.
+			if (Object.hasOwn(env, name)) {
 				continue;
 			}
 			env[name] = value;
@@ -141,7 +156,8 @@ export function applyEnvFile(root, { env = process.env } = {}) {
  * @return {string|undefined} The value, or undefined when unset/empty.
  */
 export function envSecret(name, { env = process.env } = {}) {
-	const value = env[name];
+	// Own properties only — env.constructor etc. must read as unset.
+	const value = Object.hasOwn(env, name) ? env[name] : undefined;
 	if (value !== undefined && value !== '') {
 		return value;
 	}
