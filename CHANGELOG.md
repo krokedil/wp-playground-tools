@@ -22,6 +22,17 @@
   public. `--tunnel` on a warm persistent site provisioned before the guard
   existed now refuses to launch and asks for one `--fresh` run rather than
   publishing an ungated site.
+  The gate is keyed on the request coming from off this machine, not on the
+  password file existing, and no remote login is possible when that file is
+  missing or unreadable — every way it can go missing (a restrictive umask, a
+  crash, a second launch in the same worktree clearing it while the first run's
+  tunnel is still up) would otherwise leave the default password working on a
+  public URL. Both runtime contract files are chmodded after writing for the
+  same reason: `writeFileSync`'s mode is masked by the caller's umask, so
+  `umask 077` produced files the Playground runtime reads as unreadable — the
+  guard then found no password, and `proxy-url.txt` left the site on localhost
+  URLs. A failure while publishing the URL now also takes the proxy back down
+  instead of leaving a stray ngrok agent holding the reserved domain.
 - Development mode gained a guest toggle for logged-out testing:
   `?krokedil-guest=1` on any local URL (or **Browse as guest** in the admin bar)
   logs out and sets a 12-hour cookie that stands both the dev auto-login and

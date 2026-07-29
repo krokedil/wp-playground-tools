@@ -24,6 +24,33 @@ const PROVIDERS = {
 };
 
 /**
+ * Write a file the Playground runtime has to read back.
+ *
+ * The runtime reads the mount as a different uid than the host process, so an
+ * owner-only file is unreadable there — and the mu-plugins fail quietly when
+ * that happens (an unreadable tunnel-password.txt used to leave the default
+ * admin password working on a public URL; an unreadable proxy-url.txt leaves
+ * the site serving localhost URLs). Hence an explicit chmod: the mode passed
+ * to writeFileSync goes through open(2) and is masked by the caller's umask,
+ * so `umask 077` would recreate exactly that bug, while chmod is absolute and
+ * also fixes a file that already exists.
+ *
+ * @param {string} file     Absolute path to write.
+ * @param {string} contents File contents.
+ */
+function writeRuntimeReadable(file, contents) {
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.writeFileSync(file, contents);
+	try {
+		fs.chmodSync(file, 0o644);
+	} catch (err) {
+		throw new Error(
+			`could not make ${file} readable by the Playground runtime: ${err.message}`
+		);
+	}
+}
+
+/**
  * Path of the proxy URL file inside the plugin's staging dir.
  *
  * @param {string} root Plugin root.
@@ -40,8 +67,7 @@ export function proxyUrlFile(root) {
  * @param {string} url  Public URL.
  */
 export function writeProxyUrl(root, url) {
-	fs.mkdirSync(path.dirname(proxyUrlFile(root)), { recursive: true });
-	fs.writeFileSync(proxyUrlFile(root), url + '\n');
+	writeRuntimeReadable(proxyUrlFile(root), url + '\n');
 }
 
 /**
@@ -68,17 +94,11 @@ export function tunnelPasswordFile(root) {
 /**
  * Publish the tunnel admin password to the site.
  *
- * Default permissions, like proxy-url.txt: an owner-only 0600 file reads as
- * unreadable inside the Playground runtime, so the guard mu-plugin silently
- * finds no password and lets the default one through — the exact failure this
- * whole mechanism exists to prevent.
- *
  * @param {string} root     Plugin root.
  * @param {string} password The password wp-login accepts over the tunnel.
  */
 export function writeTunnelPassword(root, password) {
-	fs.mkdirSync(path.dirname(tunnelPasswordFile(root)), { recursive: true });
-	fs.writeFileSync(tunnelPasswordFile(root), password + '\n');
+	writeRuntimeReadable(tunnelPasswordFile(root), password + '\n');
 }
 
 /**
@@ -154,9 +174,15 @@ export function resolveTunnelDomain(config, tunnelDomain = null) {
  * @param {string}      opts.kind           'tunnel' | 'https'.
  * @param {string|null} [opts.tunnelDomain] Per-run tunnel domain override
  *                                          (bare hostname, or 'none').
+ * @param {Object}      [opts.providers]    Provider loaders; a seam for tests,
+ *                                          which must not spawn real agents.
  * @return {Promise<{url: string, stop: Function}>} The running proxy.
  */
-export async function startProxy(root, config, { port, kind, tunnelDomain }) {
+export async function startProxy(
+	root,
+	config,
+	{ port, kind, tunnelDomain, providers = PROVIDERS }
+) {
 	if (!port) {
 		throw new Error(
 			'cannot start a proxy without a resolved port (pass --port or let the tool pick one).'
@@ -170,23 +196,31 @@ export async function startProxy(root, config, { port, kind, tunnelDomain }) {
 		handle = await startLocalHttps({ port, hosts: config.https.hosts });
 	} else {
 		const providerName = config.tunnel?.provider ?? 'ngrok';
-		const load = PROVIDERS[providerName];
+		const load = providers[providerName];
 		if (!load) {
 			throw new Error(
 				`unknown tunnel provider "${providerName}" — available: ${Object.keys(
-					PROVIDERS
+					providers
 				).join(', ')}.`
 			);
 		}
 		const { startTunnel } = await load();
 		const domain = resolveTunnelDomain(config, tunnelDomain);
-		handle = await startTunnel({ port, domain });
 
-		// The site is about to be world-reachable: arm the guard mu-plugin
-		// before the URL is published, so no request can arrive while
-		// wp-login.php still accepts the default password.
+		// Arm the guard mu-plugin *before* the tunnel exists — the password
+		// doesn't depend on the URL, and there must be no window in which the
+		// site is world-reachable while wp-login still accepts the default
+		// password. A failure here aborts the run instead of publishing.
 		login = resolveTunnelPassword();
 		writeTunnelPassword(root, login.password);
+
+		try {
+			handle = await startTunnel({ port, domain });
+		} catch (err) {
+			// startTunnel kills its own agent, so only our file is left.
+			clearTunnelPassword(root);
+			throw err;
+		}
 
 		if (!domain) {
 			process.stderr.write(
@@ -200,26 +234,44 @@ export async function startProxy(root, config, { port, kind, tunnelDomain }) {
 		}
 	}
 
-	writeProxyUrl(root, handle.url);
-	process.stderr.write(
-		`\n▶ playground: public URL: ${handle.url}\n` +
-			`  WordPress home/siteurl and webhook callbacks now use this URL.\n` +
-			`  The local http://127.0.0.1:${port} stays reachable for tooling.\n` +
-			(login
-				? `  wp-admin over the public URL: admin / ${
-						login.fromEnv
-							? '<your $KROKEDIL_PG_TUNNEL_PASS>'
-							: login.password
-					}` +
-					`${
-						login.fromEnv
-							? ''
-							: ' (set KROKEDIL_PG_TUNNEL_PASS for a password you already know)'
-					}\n` +
-					`  The default admin/password is refused through the tunnel; locally it still works.\n`
-				: '') +
-			'\n'
-	);
+	// From here on the proxy is running, so anything that throws has to take it
+	// down: an abandoned ngrok agent keeps serving (and holds the reserved
+	// domain, so the next run can't start), and an abandoned local https
+	// listener keeps the event loop alive so the CLI never exits.
+	try {
+		writeProxyUrl(root, handle.url);
+		process.stderr.write(
+			`\n▶ playground: public URL: ${handle.url}\n` +
+				`  WordPress home/siteurl and webhook callbacks now use this URL.\n` +
+				`  The local http://127.0.0.1:${port} stays reachable for tooling.\n` +
+				(login
+					? `  wp-admin over the public URL: admin / ${
+							login.fromEnv
+								? '<your $KROKEDIL_PG_TUNNEL_PASS>'
+								: login.password
+						}` +
+						`${
+							login.fromEnv
+								? ''
+								: ' (set KROKEDIL_PG_TUNNEL_PASS for a password you already know)'
+						}\n` +
+						`  The default admin/password is refused through the tunnel; requests from this machine are untouched.\n`
+					: '') +
+				'\n'
+		);
+	} catch (err) {
+		// Stop the proxy first — that is the part that leaks — then drop the
+		// contract files, secret first. Both steps are best-effort: a failure
+		// while cleaning up must not replace the error that ended the run.
+		await handle.stop().catch(() => {});
+		try {
+			clearTunnelPassword(root);
+			clearProxyUrl(root);
+		} catch {
+			// Nothing useful to do here; the next launch clears both files.
+		}
+		throw err;
+	}
 
 	return {
 		url: handle.url,

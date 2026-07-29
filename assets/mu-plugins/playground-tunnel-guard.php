@@ -8,13 +8,13 @@
  * — so without this, the URL is one form submission away from handing a
  * stranger the dashboard of a site holding your provider test keys.
  *
- * While the host tool has a tunnel running it writes the run's password to
- * .playground/tunnel-password.txt (deleted on exit, and before every launch).
- * While that file exists, requests that did *not* come from this machine:
+ * So requests that did *not* come from this machine:
  *
- *   - can only log in with that password — the default `password` is refused,
- *     for every user, so a stranger who knows Playground's defaults gets
- *     nowhere;
+ *   - can only log in with the running tunnel's password, which the host tool
+ *     writes to .playground/tunnel-password.txt (deleted on exit and before
+ *     every launch). The default `password` is refused, for every user, so a
+ *     stranger who knows Playground's defaults gets nowhere — and when there is
+ *     no readable password file, no remote login is possible at all;
  *   - never get Playground's built-in auto-login. That auto-login authenticates
  *     on a cookie marker with no password check whatsoever, so it must never
  *     answer a public request. It is not armed in the modes this tool runs
@@ -50,12 +50,14 @@ function krokedil_pg_tunnel_password_file() {
 }
 
 /**
- * The password required for logins over the tunnel.
+ * The password required for logins from off this machine.
  *
- * '' means the file exists but could not be read (host permissions that the
- * runtime can't see through, a truncated write). Callers must treat that as
- * "no login possible", never as "no tunnel": an unreadable password file used
- * to leave the default `password` working on a public URL.
+ * '' means there is none to be had — no tunnel running, a file the runtime
+ * can't read (host permissions it sees through a different uid), a truncated
+ * write, or a second launch in the same worktree having cleared it while this
+ * run's tunnel is still up. Every one of those must mean "no remote login",
+ * never "no gate": each of them has left the default `password` working on a
+ * public URL at some point during development.
  *
  * @return string The password, or '' when it can't be read.
  */
@@ -114,10 +116,13 @@ function krokedil_pg_tunnel_is_local() {
 	return true;
 }
 
-// Keyed on the file existing, not on the password being readable: a tunnel is
-// running either way, and a password we can't read must lock logins rather
-// than fall back to the default one.
-if ( file_exists( krokedil_pg_tunnel_password_file() ) && ! krokedil_pg_tunnel_is_local() ) {
+// Keyed on where the request came from, not on the password file existing: a
+// request from off this machine arrived through some proxy or tunnel, and the
+// site it reached has a documented default password. Whether we can offer it a
+// login at all depends on the password file, but the gate goes up regardless —
+// keying on the file would leave the site open in exactly the cases the file
+// is missing when it shouldn't be.
+if ( ! krokedil_pg_tunnel_is_local() ) {
 	// Disarm Playground's built-in auto-login for this request. It runs on
 	// `init` from an internal mu-plugin loaded on muplugins_loaded — later than
 	// this file — and bails when the marker is present, so setting the marker

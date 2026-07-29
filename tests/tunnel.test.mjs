@@ -20,6 +20,7 @@ import {
 	proxyUrlFile,
 	resolveTunnelDomain,
 	resolveTunnelPassword,
+	startProxy,
 	tunnelPasswordFile,
 	writeProxyUrl,
 	writeTunnelPassword,
@@ -209,18 +210,105 @@ test('tunnel password file lifecycle: write, read location, clear (idempotent)',
 		'the mu-plugin contract: .playground/tunnel-password.txt'
 	);
 	assert.equal(fs.readFileSync(file, 'utf8').trim(), 'HJKL2345');
-	// An owner-only file reads as unreadable inside the Playground runtime, so
-	// the guard mu-plugin would find no password and let the default one
-	// through on a public URL. Observed with mode 0600.
-	const mode = fs.statSync(file).mode % 0o10;
-	assert.notEqual(
-		mode,
-		0,
-		'the runtime must be able to read the password file'
-	);
 
 	clearTunnelPassword(root);
 	assert.equal(fs.existsSync(file), false);
 	// Defensive clears (before every launch) must not throw.
 	clearTunnelPassword(root);
+});
+
+test('the runtime contract files stay readable under a restrictive umask', (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-umask-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	// An owner-only file reads as unreadable inside the Playground runtime: the
+	// guard mu-plugin then finds no password and the default one works on a
+	// public URL, and the proxy-url mu-plugin leaves the site on localhost
+	// URLs. writeFileSync's mode goes through open(2) and is masked by the
+	// umask, so only an explicit chmod survives this.
+	const previous = process.umask(0o077);
+	try {
+		writeTunnelPassword(root, 'HJKL2345');
+		writeProxyUrl(root, 'https://a1b2c3.ngrok-free.app');
+	} finally {
+		process.umask(previous);
+	}
+
+	for (const file of [tunnelPasswordFile(root), proxyUrlFile(root)]) {
+		// % 0o10 isolates the other-read/write/execute digit (no bitwise ops:
+		// the eslint config forbids them).
+		assert.notEqual(
+			fs.statSync(file).mode % 0o10,
+			0,
+			`the runtime must be able to read ${path.basename(file)}`
+		);
+	}
+});
+
+test('startProxy takes the proxy down when publishing its URL fails', async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-cleanup-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	let stopped = 0;
+	const providers = {
+		ngrok: async () => ({
+			startTunnel: async () => ({
+				url: 'https://a1b2c3.ngrok-free.app',
+				stop: async () => {
+					stopped += 1;
+				},
+			}),
+		}),
+	};
+
+	// proxy-url.txt as a *directory* makes writeProxyUrl throw EISDIR once the
+	// tunnel is already up, standing in for any post-start failure (ENOSPC,
+	// EACCES, a read-only mount). The password is written before the tunnel
+	// starts, so it lands normally and the cleanup has something to remove.
+	fs.mkdirSync(path.join(root, '.playground', 'proxy-url.txt'), {
+		recursive: true,
+	});
+
+	await assert.rejects(() =>
+		startProxy(
+			root,
+			{ tunnel: { provider: 'ngrok', domain: 'kp.eu.ngrok.io' } },
+			{ port: 9881, kind: 'tunnel', providers }
+		)
+	);
+
+	// Otherwise the agent keeps serving the site and holds the reserved domain,
+	// so the next run dies with "endpoint already online".
+	assert.equal(stopped, 1, 'the tunnel must be stopped');
+	assert.equal(
+		fs.existsSync(tunnelPasswordFile(root)),
+		false,
+		'the run password must not outlive the failed run'
+	);
+});
+
+test('startProxy clears the password when the tunnel itself fails to start', async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-armfail-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	const providers = {
+		ngrok: async () => ({
+			startTunnel: async () => {
+				throw new Error(
+					'ngrok exited (code 1) before the tunnel came up.'
+				);
+			},
+		}),
+	};
+
+	await assert.rejects(
+		() =>
+			startProxy(
+				root,
+				{ tunnel: { provider: 'ngrok' } },
+				{ port: 9881, kind: 'tunnel', providers }
+			),
+		/ngrok exited/
+	);
+	assert.equal(fs.existsSync(tunnelPasswordFile(root)), false);
 });
