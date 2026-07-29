@@ -155,7 +155,7 @@ Playground (PHP-in-WASM) intermittently times out outbound HTTP requests after ~
 
 ### ⚠ Emails never send — read them in Tools → Email Log
 
-Playground's PHP has no `mail()` binary, so every `wp_mail()` call fails. On a WooCommerce site this surfaces as order notes like `Email "Processing order" failed to send: Could not instantiate mail function.` — that's the platform, not the plugin under development. The development blueprint pre-activates [WP Mail Logging](https://wordpress.org/plugins/wp-mail-logging/), which records every attempted email (recipient, subject, full body) even though the send fails: **Tools → Email Log** (`/wp-admin/tools.php?page=wpml_plugin_log`).
+Playground's PHP-in-WASM has no mail transport (no sendmail binary or MTA), so PHP's `mail()` — and with it every `wp_mail()` call — fails. On a WooCommerce site this surfaces as order notes like `Email "Processing order" failed to send: Could not instantiate mail function.` — that's the platform, not the plugin under development. The development blueprint pre-activates [WP Mail Logging](https://wordpress.org/plugins/wp-mail-logging/), which records every attempted email (recipient, subject, full body) even though the send fails: **Tools → Email Log** (`/wp-admin/tools.php?page=wpml_plugin_log`).
 
 ## Port registry
 
