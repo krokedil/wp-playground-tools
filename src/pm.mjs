@@ -39,11 +39,14 @@ export const PM_COMMANDS = {
 /**
  * Read the package-manager declaration from a parsed package.json:
  * `packageManager` first, then `devEngines.packageManager`, which may be a
- * string ("pnpm@9.15.9") or an object ({ name: "pnpm", ... }) — only the
- * name matters for picking the manager.
+ * string ("pnpm@9.15.9") or an object ({ name: "pnpm", ... }).
  *
  * @param {Object} pkg Parsed package.json contents.
- * @return {string} The raw declaration ("pnpm@9.15.9", "yarn@4.0.0"), or "" when nothing is declared.
+ * @return {string} A pattern-matchable declaration: the raw string for the
+ *                  string forms ("pnpm@9.15.9", "yarn@4.0.0"), just the
+ *                  manager name for the devEngines object form (only the
+ *                  name matters for picking the manager), or "" when
+ *                  nothing is declared.
  */
 export function readPackageManagerField(pkg) {
 	if (typeof pkg.packageManager === 'string') {
