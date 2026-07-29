@@ -9,8 +9,10 @@
   `--fresh` wiped sessions entirely (observed onboarding
   klarna-payments-for-woocommerce). Guest browsing, credential POSTs, logouts
   and `wp-login.php?action=login` are untouched; demo/e2e modes keep the
-  upstream behavior. Docs now also state the `admin` / `password` defaults and
-  the `--tunnel` exposure caveat.
+  upstream behavior. Auto-login is local-only (loopback Host required), so a
+  `--tunnel` URL always shows the normal login form instead of handing admin
+  sessions to anyone holding it. Docs now also state the `admin` / `password`
+  defaults.
 
 - Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
   crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),

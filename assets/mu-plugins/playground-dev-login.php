@@ -17,16 +17,51 @@
  * wp-login.php?action=login to summon the form), the ?loggedout screen after
  * a logout, and ?interim-login re-auth modals.
  *
- * Caveat: with --tunnel the dev site is publicly reachable, and this makes
- * wp-login.php an instant admin door for anyone holding the tunnel URL.
- * Dev sites are throwaway by design — keep real data and production keys out
- * of them (see the secrets warning in the README).
+ * Local-only by design: auto-login requires a loopback Host (localhost,
+ * 127.0.0.1, ::1, *.localhost) — direct http and the mkcert https proxy
+ * qualify, but requests arriving through an ngrok tunnel carry the tunnel
+ * domain and always get the normal form. Otherwise anyone holding the tunnel
+ * URL would be one GET away from admin. Dev sites are throwaway by design —
+ * keep real data and production keys out of them regardless (see the secrets
+ * warning in the README).
  *
  * @package Krokedil\WpPlaygroundTools
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+/**
+ * Whether the request was addressed to the machine itself.
+ *
+ * Checks hostnames, not peer addresses: a tunnel agent connects from
+ * loopback, so REMOTE_ADDR can't tell tunnel traffic apart — but ngrok
+ * delivers requests with the tunnel domain as Host (its edge routes by
+ * Host, so a spoofed localhost Host never reaches the tunnel), while the
+ * local https proxy forwards with Host/X-Forwarded-Host: localhost:<port>.
+ *
+ * @return bool True when Host (and X-Forwarded-Host, if any) is loopback.
+ */
+function krokedil_pg_dev_login_is_local() {
+	foreach ( array( 'HTTP_HOST', 'HTTP_X_FORWARDED_HOST' ) as $key ) {
+		if ( ! isset( $_SERVER[ $key ] ) ) {
+			continue;
+		}
+		$host = strtolower( trim( (string) $_SERVER[ $key ] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		// Strip the port: bracketed IPv6 first, then host:port.
+		if ( preg_match( '/^\[([^\]]+)\]/', $host, $m ) ) {
+			$host = $m[1];
+		} else {
+			$host = preg_replace( '/:\d+$/', '', $host );
+		}
+		$local = in_array( $host, array( 'localhost', '127.0.0.1', '::1' ), true )
+			|| '.localhost' === substr( $host, -10 );
+		if ( ! $local ) {
+			return false;
+		}
+	}
+	return isset( $_SERVER['HTTP_HOST'] );
 }
 
 /**
@@ -40,6 +75,10 @@ function krokedil_pg_dev_login() {
 	}
 	$path = (string) wp_parse_url( (string) $_SERVER['REQUEST_URI'], PHP_URL_PATH ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 	if ( 'wp-login.php' !== basename( $path ) ) {
+		return;
+	}
+	// Never over a tunnel: tunnel requests carry the public domain as Host.
+	if ( ! krokedil_pg_dev_login_is_local() ) {
 		return;
 	}
 	// Explicit flows that must render the form.
