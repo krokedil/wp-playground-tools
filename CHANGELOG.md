@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- `--tunnel` runs now gate wp-admin behind a per-run password. A tunnel URL is
+  reachable by anyone who has it, and the admin credentials are the documented
+  Playground default — verified against a live ngrok tunnel, `admin` /
+  `password` logged straight into the dashboard of a site holding provider test
+  keys. The always-staged `playground-tunnel-guard.php` mu-plugin now refuses
+  the default password for requests that didn't come from the developer's
+  machine (loopback Host and REMOTE_ADDR, same trust rule as the dev
+  auto-login) and accepts only the run's tunnel password, printed with the
+  public URL or taken from `KROKEDIL_PG_TUNNEL_PASS` for a login that is the
+  same on every playground. It also sets Playground's auto-login marker for
+  those requests: that auto-login authenticates on a cookie with no password
+  check, and while it isn't armed in the modes this tool runs today
+  (@wp-playground/cli 3.1.x), a future CLI must not be able to hand admin
+  sessions to the public URL. The password lives in
+  `.playground/tunnel-password.txt` (removed on exit and before every launch),
+  so non-tunnelled sites, local logins, the dev auto-login and `screenshots`
+  are untouched, and the storefront, REST routes and webhook callbacks stay
+  public. `--tunnel` on a warm persistent site provisioned before the guard
+  existed now refuses to launch and asks for one `--fresh` run rather than
+  publishing an ungated site.
 - Development mode now stages a `playground-dev-login.php` mu-plugin that
   auto-submits any plain GET of wp-login.php as `admin`. The Playground CLI's
   own auto-login is single-shot per client — a curl health check or tool probe

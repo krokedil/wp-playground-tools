@@ -16,9 +16,13 @@ import {
 } from '../src/proxy/ngrok.mjs';
 import {
 	clearProxyUrl,
+	clearTunnelPassword,
 	proxyUrlFile,
 	resolveTunnelDomain,
+	resolveTunnelPassword,
+	tunnelPasswordFile,
 	writeProxyUrl,
+	writeTunnelPassword,
 } from '../src/proxy/tunnel.mjs';
 
 test('parseNgrokLogLine finds the started-tunnel event', () => {
@@ -162,4 +166,61 @@ test('proxy-url file lifecycle: write, read location, clear (idempotent)', (t) =
 	assert.equal(fs.existsSync(file), false);
 	// Defensive clears (before non-proxied launches) must not throw.
 	clearProxyUrl(root);
+});
+
+test('resolveTunnelPassword prefers KROKEDIL_PG_TUNNEL_PASS', () => {
+	const fromEnv = resolveTunnelPassword({
+		env: { KROKEDIL_PG_TUNNEL_PASS: 'team-shared-pass' },
+	});
+	assert.deepEqual(fromEnv, {
+		password: 'team-shared-pass',
+		fromEnv: true,
+	});
+});
+
+test('resolveTunnelPassword generates one when the env value is unset or empty', () => {
+	for (const env of [{}, { KROKEDIL_PG_TUNNEL_PASS: '' }]) {
+		const generated = resolveTunnelPassword({ env });
+		assert.equal(generated.fromEnv, false);
+		assert.equal(generated.password.length, 20);
+		assert.match(generated.password, /^[A-HJ-NP-Z2-9]+$/);
+	}
+	// Inherited properties must read as unset, not as a password.
+	const inherited = resolveTunnelPassword({
+		env: Object.create({ KROKEDIL_PG_TUNNEL_PASS: 'inherited' }),
+	});
+	assert.equal(inherited.fromEnv, false);
+	// Two runs must not share a password.
+	assert.notEqual(
+		resolveTunnelPassword({ env: {} }).password,
+		resolveTunnelPassword({ env: {} }).password
+	);
+});
+
+test('tunnel password file lifecycle: write, read location, clear (idempotent)', (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-tunnel-pass-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	writeTunnelPassword(root, 'HJKL2345');
+	const file = tunnelPasswordFile(root);
+	assert.equal(
+		file,
+		path.join(root, '.playground', 'tunnel-password.txt'),
+		'the mu-plugin contract: .playground/tunnel-password.txt'
+	);
+	assert.equal(fs.readFileSync(file, 'utf8').trim(), 'HJKL2345');
+	// An owner-only file reads as unreadable inside the Playground runtime, so
+	// the guard mu-plugin would find no password and let the default one
+	// through on a public URL. Observed with mode 0600.
+	const mode = fs.statSync(file).mode % 0o10;
+	assert.notEqual(
+		mode,
+		0,
+		'the runtime must be able to read the password file'
+	);
+
+	clearTunnelPassword(root);
+	assert.equal(fs.existsSync(file), false);
+	// Defensive clears (before every launch) must not throw.
+	clearTunnelPassword(root);
 });

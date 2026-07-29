@@ -194,6 +194,16 @@ test('the auto-login mu-plugin stays out of demo/e2e blueprints', () => {
 	}
 });
 
+test('every mode links the tunnel guard (--tunnel is a per-run flag)', () => {
+	for (const mode of ['development', 'demo', 'e2e']) {
+		const code = JSON.stringify(composeBlueprint(rwwcConfig, mode).steps);
+		assert.ok(
+			code.includes('playground-tunnel-guard.php'),
+			`missing tunnel guard link in ${mode}`
+		);
+	}
+});
+
 test('extraSteps are appended verbatim at the end', () => {
 	const config = normalizeConfig({
 		slug: 'a-plugin',
@@ -265,6 +275,7 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 	assert.ok(fs.existsSync(blueprintPath));
 	for (const staged of [
 		'mu-plugins/playground-proxy-url.php',
+		'mu-plugins/playground-tunnel-guard.php',
 		'mu-plugins/playground-dev-login.php',
 		'mu-plugins/playground-seeder.php',
 		'mu-plugins/my-helper.php',

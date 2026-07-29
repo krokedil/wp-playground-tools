@@ -22,8 +22,52 @@ import process from 'node:process';
 
 import { composeAndStage } from './blueprint/compose.mjs';
 import { loadConfig, validateTunnelDomain } from './config.mjs';
-import { launch, log } from './prepare.mjs';
-import { clearProxyUrl } from './proxy/tunnel.mjs';
+import {
+	buildModes,
+	decideBlueprint,
+	isMuPluginLinked,
+	isProvisioned,
+	launch,
+	log,
+} from './prepare.mjs';
+import { clearProxyUrl, clearTunnelPassword } from './proxy/tunnel.mjs';
+
+/** The mu-plugin that gates logins while a tunnel is running. */
+const TUNNEL_GUARD = 'playground-tunnel-guard.php';
+
+/**
+ * Why a warm persistent site can't be tunnelled, if it can't.
+ *
+ * The guard mu-plugin is symlinked into the site by the blueprint's link step,
+ * so a site provisioned before this package shipped the guard would boot
+ * without it — and publish a site whose wp-login still accepts the default
+ * password. Refuse instead, and say how to fix it. Blueprint modes (server
+ * development|demo|e2e) apply a blueprint on every run, so they always have it.
+ *
+ * @param {string}   root     Plugin root.
+ * @param {Object}   config   Normalized plugin config.
+ * @param {string}   modeName Mode about to launch.
+ * @param {string[]} args     Args forwarded to launch().
+ * @return {string|null} An error message, or null when the run is safe.
+ */
+function tunnelGuardBlocker(root, config, modeName, args) {
+	const mode = buildModes(config)[modeName];
+	if (!mode?.persistent || !isProvisioned(root)) {
+		return null;
+	}
+	if (decideBlueprint(mode.blueprint, args, true).provisioning) {
+		return null; // Reprovisioning links it.
+	}
+	if (isMuPluginLinked(root, TUNNEL_GUARD)) {
+		return null;
+	}
+	return (
+		`this site was provisioned before the tunnel admin guard existed, so ` +
+		`publishing it would expose wp-login with the default password. ` +
+		`Re-run once with --fresh to install the guard (site data is reset), ` +
+		`or drop --tunnel to keep working locally.`
+	);
+}
 
 /**
  * Run the CLI.
@@ -123,9 +167,19 @@ async function runMode(root, modeName, args) {
 
 	const config = await loadConfig(root);
 
-	// A stale proxy-url.txt from a crashed proxied run would silently point
-	// the site at a dead URL — always start clean.
+	// Stale files from a crashed proxied run would silently point the site at a
+	// dead URL, or demand a password nobody has any more — always start clean.
 	clearProxyUrl(root);
+	clearTunnelPassword(root);
+
+	if (wantsTunnel) {
+		const blocker = tunnelGuardBlocker(root, config, modeName, forwarded);
+		if (blocker) {
+			process.stderr.write(`✖ playground: ${blocker}\n`);
+			process.exitCode = 1;
+			return;
+		}
+	}
 
 	const handle = await launch(root, config, modeName, forwarded);
 	if (!handle) {
@@ -140,6 +194,7 @@ async function runMode(root, modeName, args) {
 			await p.stop().catch(() => {});
 		}
 		clearProxyUrl(root);
+		clearTunnelPassword(root);
 	};
 
 	if (wantsTunnel || wantsHttps) {

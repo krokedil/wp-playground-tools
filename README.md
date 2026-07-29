@@ -36,7 +36,7 @@ pnpm run playground:start
 
 On a fresh clone/worktree that one command installs composer + Node deps (pnpm or npm, per the detection above), builds assets (when configured), composes the blueprint, provisions the site, and boots it. Warm boots preserve data; `--fresh` reprovisions.
 
-Admin credentials are the Playground CLI defaults, `admin` / `password`. In development mode you rarely type them: a staged mu-plugin auto-submits the wp-login form as `admin` (including after `--fresh` wipes sessions), while guest storefront browsing and logging in as another user keep working. Auto-login only answers local requests — browsing via a `--tunnel` URL shows the normal login form (type the credentials once per browser), so the public URL never hands out admin sessions. See [docs/reference.md](docs/reference.md#defaults-and-development-mode-extras).
+Admin credentials are the Playground CLI defaults, `admin` / `password`. In development mode you rarely type them: a staged mu-plugin auto-submits the wp-login form as `admin` (including after `--fresh` wipes sessions), while guest storefront browsing and logging in as another user keep working. Auto-login only answers local requests — browsing via a `--tunnel` URL shows the normal login form, and there the default password is refused in favour of a [per-run tunnel password](#tunnel-logins-need-the-run-password), so the public URL never hands out admin sessions. See [docs/reference.md](docs/reference.md#defaults-and-development-mode-extras).
 
 ## Commands
 
@@ -142,6 +142,14 @@ Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` env or `ngrok co
 **Reserve a domain for webhook work** (`tunnel.domain`): an ephemeral URL changes on every run, so callback registrations at the provider go stale. The tool warns loudly when tunneling without one. Reserve the domain at dashboard.ngrok.com/domains under the company account and claim it in the [tunnel domain registry](#tunnel-domain-registry).
 
 **Parallel worktrees**: sites, ports and tunnels are per-worktree automatically (each worktree gets its own persistent site and auto-shifts to a free port). The one shared thing is the committed `tunnel.domain` — a second simultaneous tunnel on the same plugin needs `--tunnel-domain=<second-reserved-domain>` (stable webhooks; claim it in the registry) or `--tunnel-domain=none` (quick ephemeral URL). The flag implies `--tunnel`.
+
+#### Tunnel logins need the run password
+
+A tunnel URL is reachable by anyone who has it, and Playground's admin credentials are the documented default — so a plain `--tunnel` would leave `admin` / `password` one form submission away from the dashboard of a site holding your provider test keys. While a tunnel runs, the always-staged `playground-tunnel-guard.php` mu-plugin therefore refuses the default password for requests that didn't come from your machine, and accepts only that run's tunnel password (any user, wp-login and XML-RPC alike). Local logins, the development auto-login and PR screenshots are untouched, and the storefront, REST routes and webhook callbacks stay public — gating those is the whole reason for the tunnel.
+
+The password is printed with the public URL. Export `KROKEDIL_PG_TUNNEL_PASS` (shell profile, or the plugin's gitignored `.env`) to use one password you already know across every Krokedil playground instead; it is then required but never echoed. Without it, each run generates a random one. The mechanism mirrors the proxy URL: `.playground/tunnel-password.txt`, removed on exit and before every launch, so a non-tunnelled site is never gated.
+
+A site provisioned before this guard existed has no symlink to it, so `--tunnel` on such a warm `start` site refuses to launch and asks for one `--fresh` run. Guarded or not, a playground is a dev site — keep production keys and real customer data out (see [Private options](#private-options-api-keys)).
 
 ### `--https` (local only — secure-context features, no tunnel account)
 
