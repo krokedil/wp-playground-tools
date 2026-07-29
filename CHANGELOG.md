@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fix: `init` rewrote the consumer's whole `package.json` (and a pre-existing
+  `.claude/launch.json`) with tab indentation; the existing indentation is now
+  detected and preserved (tabs remain the default for new files). (Observed
+  onboarding klarna-payments-for-woocommerce.)
+
 ## 1.1.1 — 2026-07-29
 
 - Fix: `pnpm exec krokedil-playground …` was a silent no-op under pnpm — the
