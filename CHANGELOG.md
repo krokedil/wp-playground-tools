@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — unreleased
+## Unreleased
 
 - Standalone dogfooding: committed `sandbox/` plugin + config, `sandbox:*`
   scripts (http / https / ngrok / persistent start on basePort 9880) and

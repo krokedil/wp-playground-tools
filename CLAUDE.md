@@ -39,4 +39,4 @@ pnpm run sandbox:start   # persistent, worktree-isolated site on :9880
 
 ## Releases
 
-Bump `version`, update `CHANGELOG.md`, tag `vX.Y.Z`, push the tag — consumers resolve via `#semver:^1`. Smoke-test `@wp-playground/cli` pin bumps before tagging (a bad pin fans out to every plugin).
+Merging and releasing are decoupled — consumers only see `vX.Y.Z` git tags (`#semver:^1`), never `main`. Per PR: add changelog bullets under `## Unreleased`, do **not** bump `version`. To release (one commit on `main`): rename `Unreleased` to `## X.Y.Z — <date>` picking major/minor/patch from what accumulated, bump `package.json` to match, tag `vX.Y.Z`, push the tag. Consumers pick it up via `pnpm update`. Smoke-test `@wp-playground/cli` pin bumps before tagging (a bad pin fans out to every plugin).

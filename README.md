@@ -136,4 +136,18 @@ pnpm run sandbox:start   # persistent worktree-isolated site on :9880
 
 The sandbox's dashboard widget and `GET /wp-json/krokedil-sandbox/v1/ping` echo `home_url()`, `is_ssl()` and the forwarded headers, so each transport is verifiable at a glance. `.claude/launch.json` carries preview entries for the three server variants.
 
-Releases: bump `version`, update `CHANGELOG.md`, tag `vX.Y.Z`, push the tag. Consumers pick the release up via `pnpm update` (the `#semver:^1` range resolves against git tags). Smoke-test `@wp-playground/cli` pin bumps before tagging — a bad pin fans out to every plugin.
+### Releases
+
+Merging and releasing are decoupled: consumers only ever see git tags (`#semver:^1` never resolves against `main`), so any number of PRs can accumulate before a release.
+
+1. **Every PR** adds its changelog bullets under `## Unreleased` in `CHANGELOG.md` — no version bump in feature PRs (the release type isn't known until the batch is complete, and bumps conflict between parallel PRs).
+2. **To release**, one commit on `main`: rename `Unreleased` to `## X.Y.Z — <date>` (major/minor/patch based on what actually accumulated), bump `version` in `package.json` to match, then:
+
+   ```sh
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+   Optionally `gh release create vX.Y.Z` with the changelog section as notes.
+3. Consumers pick it up via `pnpm update` (the `^1` range resolves against tags; a major bump requires consumers to update their dependency spec deliberately).
+
+Smoke-test `@wp-playground/cli` pin bumps before tagging — a bad pin fans out to every plugin.
