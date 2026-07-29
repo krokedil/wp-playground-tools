@@ -15,6 +15,13 @@
   the spec on save — all versions, 9 through 11). Deliberate `#committish`
   pins are left untouched. Install docs now end with a `pnpm install` to
   realign the lockfile. (Found onboarding klarna-payments-for-woocommerce.)
+- Fix: widen the optional `@playwright/test` peer range `>=1.50.0` → `>=1.48.0`.
+  `@wordpress/scripts` (via `@wordpress/e2e-test-utils-playwright`, peer
+  `^1.48.1`) resolves `@playwright/test` 1.49.0 in consumer trees, so every
+  `pnpm install` warned "unmet peer @playwright/test@>=1.50.0: found 1.49.0" —
+  pnpm's `optional` flag silences a *missing* peer, not a version mismatch.
+  The capture code uses nothing newer than Playwright 1.27 APIs (`getByText`),
+  so 1.48+ is fully supported. (Observed in klarna-payments-for-woocommerce.)
 - Fix: `init` rewrote the consumer's whole `package.json` (and a pre-existing
   `.claude/launch.json`) with tab indentation; the existing indentation is now
   detected and preserved (tabs remain the default for new files). (Observed
