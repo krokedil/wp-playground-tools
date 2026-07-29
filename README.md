@@ -34,6 +34,8 @@ pnpm run playground:start
 
 On a fresh clone/worktree that one command installs composer + pnpm deps, builds assets (when configured), composes the blueprint, provisions the site, and boots it. Warm boots preserve data; `--fresh` reprovisions.
 
+Admin credentials are the Playground CLI defaults, `admin` / `password`. In development mode you rarely type them: a staged mu-plugin auto-submits the wp-login form as `admin` (including after `--fresh` wipes sessions), while guest storefront browsing and logging in as another user keep working — see [docs/reference.md](docs/reference.md#defaults-and-development-mode-extras).
+
 ## Commands
 
 ```

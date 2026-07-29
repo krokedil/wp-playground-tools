@@ -161,11 +161,12 @@ for (const mode of ['development', 'demo', 'e2e']) {
 	});
 }
 
-test('development blueprint stages seeder + dev-helper + proxy mu-plugins and seeds', () => {
+test('development blueprint stages seeder + dev-helper + proxy + login mu-plugins and seeds', () => {
 	const blueprint = composeBlueprint(rwwcConfig, 'development');
 	const code = JSON.stringify(blueprint.steps);
 	for (const name of [
 		'playground-proxy-url.php',
+		'playground-dev-login.php',
 		'playground-seeder.php',
 		'rwwc-dev-helper.php',
 	]) {
@@ -183,6 +184,13 @@ test('demo/e2e blueprints use the built-in fixture, not the seeder', () => {
 		const code = JSON.stringify(composeBlueprint(rwwcConfig, mode).steps);
 		assert.ok(!code.includes('playground_seed_products'));
 		assert.match(code, /simple-product/);
+	}
+});
+
+test('the auto-login mu-plugin stays out of demo/e2e blueprints', () => {
+	for (const mode of ['demo', 'e2e']) {
+		const code = JSON.stringify(composeBlueprint(rwwcConfig, mode).steps);
+		assert.ok(!code.includes('playground-dev-login.php'));
 	}
 });
 
@@ -257,6 +265,7 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 	assert.ok(fs.existsSync(blueprintPath));
 	for (const staged of [
 		'mu-plugins/playground-proxy-url.php',
+		'mu-plugins/playground-dev-login.php',
 		'mu-plugins/playground-seeder.php',
 		'mu-plugins/my-helper.php',
 		'seed-data.json',

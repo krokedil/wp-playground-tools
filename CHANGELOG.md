@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Development mode now stages a `playground-dev-login.php` mu-plugin that
+  auto-submits any plain GET of wp-login.php as `admin`. The Playground CLI's
+  own auto-login is single-shot per client — a curl health check or tool probe
+  consumes it, leaving the developer's first real visit on the login form, and
+  `--fresh` wiped sessions entirely (observed onboarding
+  klarna-payments-for-woocommerce). Guest browsing, credential POSTs, logouts
+  and `wp-login.php?action=login` are untouched; demo/e2e modes keep the
+  upstream behavior. Docs now also state the `admin` / `password` defaults and
+  the `--tunnel` exposure caveat.
+
 - Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
   crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),
   shipped in 3.1.36), so the Node `<21` ceiling is gone.

@@ -49,7 +49,7 @@ pnpm install
 pnpm run playground:start
 ```
 
-That installs composer + pnpm deps, builds assets (when configured), composes the blueprint, provisions a persistent site, and boots it. Log in with `admin` / `password`. The site is isolated per checkout (keyed by `sha256(cwd)`), so worktrees don't share state; warm boots preserve data and `--fresh` reprovisions. Logs and the SQLite database live under `~/.wordpress-playground/sites/<hash>/wp-content/` — see [README](../README.md#logs--database).
+That installs composer + pnpm deps, builds assets (when configured), composes the blueprint, provisions a persistent site, and boots it. Visiting wp-admin logs you in as `admin` automatically (the login form auto-submits in development mode, also after a `--fresh` reprovision); the credentials are `admin` / `password` whenever you do need them — after logging out, in demo/e2e modes, or to sign in as a different user via `wp-login.php?action=login`. The site is isolated per checkout (keyed by `sha256(cwd)`), so worktrees don't share state; warm boots preserve data and `--fresh` reprovisions. Logs and the SQLite database live under `~/.wordpress-playground/sites/<hash>/wp-content/` — see [README](../README.md#logs--database).
 
 ## 5. Optional pieces
 
