@@ -77,6 +77,48 @@ test('ensurePrereqs fails actionably when "build" is set without package.json', 
 	}
 });
 
+test('ensurePrereqs installs with the manager detected from package.json', (t) => {
+	// Offline: npm_execpath points at a recorder stub that logs its argv and
+	// exits 0, so the strict install "succeeds" and nothing on PATH is spawned.
+	const stubSource = `const fs = require('node:fs');
+fs.appendFileSync(process.env.PM_STUB_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');
+`;
+	const run = (pkgBody, stubName) => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-prereq-pm-'));
+		t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+		fs.writeFileSync(path.join(dir, 'package.json'), pkgBody);
+		const stubPath = path.join(dir, stubName);
+		fs.writeFileSync(stubPath, stubSource);
+		const logPath = path.join(dir, 'stub.log');
+		const saved = {
+			npm_execpath: process.env.npm_execpath,
+			PM_STUB_LOG: process.env.PM_STUB_LOG,
+		};
+		process.env.npm_execpath = stubPath;
+		process.env.PM_STUB_LOG = logPath;
+		try {
+			ensurePrereqs(dir, { composer: null, build: null }, false);
+		} finally {
+			process.env.npm_execpath = saved.npm_execpath;
+			if (saved.PM_STUB_LOG === undefined) {
+				delete process.env.PM_STUB_LOG;
+			} else {
+				process.env.PM_STUB_LOG = saved.PM_STUB_LOG;
+			}
+		}
+		return fs
+			.readFileSync(logPath, 'utf8')
+			.trim()
+			.split('\n')
+			.map((line) => JSON.parse(line));
+	};
+
+	assert.deepEqual(run('{"name":"undeclared"}', 'npm-cli.js'), [['ci']]);
+	assert.deepEqual(run('{"packageManager":"pnpm@9.15.9"}', 'pnpm.cjs'), [
+		['install', '--frozen-lockfile'],
+	]);
+});
+
 test('ensurePrereqs is a no-op for a root without package.json', () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-sandbox-prereqs-'));
 	try {

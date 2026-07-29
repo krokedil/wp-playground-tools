@@ -9,10 +9,16 @@
   `--fresh` wiped sessions entirely (observed onboarding
   klarna-payments-for-woocommerce). Guest browsing, credential POSTs, logouts
   and `wp-login.php?action=login` are untouched; demo/e2e modes keep the
-  upstream behavior. Auto-login is local-only (loopback Host required), so a
-  `--tunnel` URL always shows the normal login form instead of handing admin
-  sessions to anyone holding it. Docs now also state the `admin` / `password`
-  defaults.
+  upstream behavior. Auto-login is local-only (loopback Host and REMOTE_ADDR
+  required), so a `--tunnel` URL always shows the normal login form instead
+  of handing admin sessions to anyone holding it. Docs now also state the
+  `admin` / `password` defaults.
+- The bootstrap now prints a one-line heads-up before `composer install`
+  when no GitHub token is configured: the per-package "Could not
+  authenticate against github.com" warnings for private packages are
+  composer's expected git-clone fallback, not failures, and
+  `composer config -g github-oauth.github.com <token>` silences them.
+  (Observed onboarding klarna-payments-for-woocommerce.)
 
 - Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
   crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),
@@ -27,10 +33,40 @@
   the spec on save — all versions, 9 through 11). Deliberate `#committish`
   pins are left untouched. Install docs now end with a `pnpm install` to
   realign the lockfile. (Found onboarding klarna-payments-for-woocommerce.)
+- Fix: widen the optional `@playwright/test` peer range `>=1.50.0` → `>=1.48.0`.
+  `@wordpress/scripts` (via `@wordpress/e2e-test-utils-playwright`, peer
+  `^1.48.1`) resolves `@playwright/test` 1.49.0 in consumer trees, so every
+  `pnpm install` warned "unmet peer @playwright/test@>=1.50.0: found 1.49.0" —
+  pnpm's `optional` flag silences a *missing* peer, not a version mismatch.
+  The capture code uses nothing newer than Playwright 1.27 APIs (`getByText`),
+  so 1.48+ is fully supported. (Observed in klarna-payments-for-woocommerce.)
 - Fix: `init` rewrote the consumer's whole `package.json` (and a pre-existing
   `.claude/launch.json`) with tab indentation; the existing indentation is now
   detected and preserved (tabs remain the default for new files). (Observed
   onboarding klarna-payments-for-woocommerce.)
+- Package-manager detection, mirroring Krokedil CI: the Node manager is read
+  from package.json's `packageManager` (fallback `devEngines.packageManager`,
+  string or object form) — pnpm iff declared, npm otherwise; lockfile presence
+  is intentionally ignored (`src/pm.mjs`, kept byte-compatible with
+  krokedil-wp-ci's `build-plugin.js`). Installs and builds run with the
+  detected manager: `pnpm install --frozen-lockfile` / `npm ci`, each with a
+  lockfile-repairing fallback, and `<pm> run <build>`.
+- Fix: `init` no longer stamps `packageManager: "pnpm@…"` / `engines.pnpm`
+  onto an existing package.json without a declaration — absence of the field
+  is what makes the centralized CI build with npm, so the stamp silently
+  flipped npm plugins' CI to pnpm (where `--frozen-lockfile` fails with no
+  pnpm-lock.yaml). Fresh scaffolds (init creates the package.json) still
+  default to pnpm. `.npmrc use-node-version` is now written for pnpm plugins
+  only, launch entries and the CLAUDE.md section use the detected manager
+  (including npm's mandatory `--` flag separator).
+- Bootstrap shim v2: self-detects the manager with the same rule (inline —
+  it runs pre-install) and installs via `npm ci`/`npm install` on npm
+  plugins. Existing consumers pick it up with `init --update`; npm plugins
+  stamped by older inits must also delete the stamped `packageManager` +
+  `engines.pnpm` by hand (see docs/onboarding.md).
+- Provisioning on too-old Node (< 20.19) only attempts the `pnpm exec node`
+  repin for pnpm-managed plugins (or when already running under pnpm);
+  npm plugins get an `nvm use` message instead.
 
 ## 1.1.1 — 2026-07-29
 

@@ -4,7 +4,7 @@ Step-by-step guide for adopting `@krokedil/wp-playground-tools` in a plugin repo
 
 ## 0. Prerequisites
 
-- **pnpm >= 9.13** and git. Node is handled for you: `init` pins `use-node-version=22.23.2` in `.npmrc`, so pnpm downloads and uses the right Node automatically.
+- **pnpm >= 9.13 or npm**, matching the plugin, and git. The tool picks the manager the same way Krokedil CI does: from `packageManager` (or `devEngines.packageManager`) in package.json — pnpm iff declared, npm otherwise (lockfiles are ignored). For pnpm plugins Node is handled for you: `init` pins `use-node-version=22.23.2` in `.npmrc`, so pnpm downloads and uses the right Node automatically. npm plugins get `.nvmrc` only — any Node >=20.19 works (`.nvmrc` pins 22 LTS for nvm users).
 - The plugin's main PHP file carries a `Plugin Name:` header at the repo root — `init` infers the slug from it (falls back to the directory name).
 - The install spec `#semver:^1` resolves against this repo's `vX.Y.Z` git tags; new releases are picked up with `pnpm update`.
 
@@ -17,6 +17,13 @@ pnpm install
 ```
 
 `pnpm add` resolves the `#semver:^1` range (you get the newest `v1.x.y` tag) but saves the dependency in `package.json` **without** it — a bare git URL that would track the default branch instead of releases. `init` corrects the saved spec back to `#semver:^1`, and the trailing `pnpm install` realigns the lockfile with it (skipping it fails `--frozen-lockfile` installs later).
+
+For an npm plugin (npm keeps the `#semver:` range on save, so no trailing install is needed):
+
+```sh
+npm i -D "@krokedil/wp-playground-tools@github:krokedil/wp-playground-tools#semver:^1"
+npm exec krokedil-playground init
+```
 
 `init` is idempotent and writes/merges the files listed in the [README install section](../README.md#install-per-plugin): the `tools/playground.mjs` shim, a starter `playground.config.mjs` (yours to edit — never overwritten), `package.json` scripts, `.claude/launch.json` preview entries, a marker-delimited "WP Playground" section in the plugin's `CLAUDE.md`, the Node pin, and ignore entries.
 
@@ -49,7 +56,7 @@ pnpm install
 pnpm run playground:start
 ```
 
-That installs composer + pnpm deps, builds assets (when configured), composes the blueprint, provisions a persistent site, and boots it. Visiting wp-admin logs you in as `admin` automatically (the login form auto-submits in development mode, also after a `--fresh` reprovision); the credentials are `admin` / `password` whenever you do need them — after logging out, in demo/e2e modes, when browsing via a `--tunnel` URL (auto-login is local-only, so the public URL always shows the form), or to sign in as a different user via `wp-login.php?action=login`. The site is isolated per checkout (keyed by `sha256(cwd)`), so worktrees don't share state; warm boots preserve data and `--fresh` reprovisions. Logs and the SQLite database live under `~/.wordpress-playground/sites/<hash>/wp-content/` — see [README](../README.md#logs--database).
+(npm plugins: `npm install && npm run playground:start`, and forward any extra flags after a `--` separator — `npm run playground:start -- --fresh`.) That installs composer + Node deps, builds assets (when configured), composes the blueprint, provisions a persistent site, and boots it. If you have no GitHub token configured for composer, private `krokedil/*` packages each print `Could not authenticate against github.com … Now trying to download from source` — that's composer's expected fallback to git clone, not a failure (the bootstrap prints a heads-up saying so); `composer config -g github-oauth.github.com <token>` silences it and makes installs faster. Visiting wp-admin logs you in as `admin` automatically (the login form auto-submits in development mode, also after a `--fresh` reprovision); the credentials are `admin` / `password` whenever you do need them — after logging out, in demo/e2e modes, when browsing via a `--tunnel` URL (auto-login is local-only, so the public URL always shows the form), or to sign in as a different user via `wp-login.php?action=login`. The site is isolated per checkout (keyed by `sha256(cwd)`), so worktrees don't share state; warm boots preserve data and `--fresh` reprovisions. Logs and the SQLite database live under `~/.wordpress-playground/sites/<hash>/wp-content/` — see [README](../README.md#logs--database).
 
 ## 5. Optional pieces
 
@@ -68,3 +75,5 @@ pnpm exec krokedil-playground init --update
 ```
 
 It re-stamps the generated files (shim, launch entries, scripts, Node pin) without touching your `playground.config.mjs`.
+
+**Migrating an npm plugin scaffolded before package-manager detection**: older `init` versions stamped `packageManager: "pnpm@…"` and `engines.pnpm` onto every package.json, which flips the plugin's CI build from npm to pnpm. If that happened to an npm plugin, delete those two fields by hand (`init --update` never removes user fields) and run `npm exec krokedil-playground init --update` to refresh the shim and launch entries.
