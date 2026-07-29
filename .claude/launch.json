@@ -1,0 +1,25 @@
+{
+	"version": "0.0.1",
+	"configurations": [
+		{
+			"name": "sandbox-http",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["run", "sandbox:http"],
+			"port": 9881,
+			"autoPort": true
+		},
+		{
+			"name": "sandbox-https",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["run", "sandbox:https"],
+			"port": 10281,
+			"url": "https://localhost:10281"
+		},
+		{
+			"name": "sandbox-ngrok",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["run", "sandbox:ngrok"],
+			"port": 9881
+		}
+	]
+}

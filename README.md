@@ -16,6 +16,7 @@ pnpm exec krokedil-playground init
 | `tools/playground.mjs` | generated | bootstrap shim (Node built-ins only; installs `node_modules` when missing, then hands over to the package). Refresh with `init --update`. |
 | `playground.config.mjs` | **the plugin** | the single per-plugin contract (schema below). Never overwritten. |
 | `.claude/launch.json` | generated | preview entries per mode, `autoPort: true`. |
+| `CLAUDE.md` | merged | a marker-delimited "WP Playground" section for Claude (commands, where the `--tunnel`/`--https` public URL lives, login, log/DB paths). Everything outside the markers is untouched. |
 | `package.json` | merged | `playground:*` scripts, this dev dependency, `engines` + Node pin. |
 | `.npmrc` / `.nvmrc` | generated | `use-node-version=20.19.0` — the Playground CLI's `--reset` breaks on Node 22+. |
 | `.gitignore` / `.kernlignore` | appended | `.playground/` (generated blueprints + staged assets), `pr-screenshots/`. |
@@ -111,6 +112,7 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 |---|---|
 | 8880 | returns-and-withdrawals |
 | 8890 | *(next plugin here)* |
+| 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
 
 ## Logs / database
 
@@ -124,4 +126,29 @@ pnpm test        # node:test — includes blueprint parity + golden tests
 pnpm run lint
 ```
 
-Releases: bump `version`, update `CHANGELOG.md`, tag `vX.Y.Z`, push the tag. Consumers pick the release up via `pnpm update` (the `#semver:^1` range resolves against git tags). Smoke-test `@wp-playground/cli` pin bumps before tagging — a bad pin fans out to every plugin.
+Dogfood against the committed `sandbox/` plugin — no consumer repo needed:
+
+```sh
+pnpm run sandbox:http    # ephemeral development server on :9881
+pnpm run sandbox:https   # + mkcert reverse proxy on https://localhost:10281
+pnpm run sandbox:ngrok   # + ngrok tunnel (public URL printed)
+pnpm run sandbox:start   # persistent worktree-isolated site on :9880
+```
+
+The sandbox's dashboard widget and `GET /wp-json/krokedil-sandbox/v1/ping` echo `home_url()`, `is_ssl()` and the forwarded headers, so each transport is verifiable at a glance. `.claude/launch.json` carries preview entries for the three server variants.
+
+### Releases
+
+Merging and releasing are decoupled: consumers only ever see git tags (`#semver:^1` never resolves against `main`), so any number of PRs can accumulate before a release.
+
+1. **Every PR** adds its changelog bullets under `## Unreleased` in `CHANGELOG.md` — no version bump in feature PRs (the release type isn't known until the batch is complete, and bumps conflict between parallel PRs).
+2. **To release**, one commit on `main`: rename `Unreleased` to `## X.Y.Z — <date>` (major/minor/patch based on what actually accumulated), bump `version` in `package.json` to match, then:
+
+   ```sh
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+   Optionally `gh release create vX.Y.Z` with the changelog section as notes.
+3. Consumers pick it up via `pnpm update` (the `^1` range resolves against tags; a major bump requires consumers to update their dependency spec deliberately).
+
+Smoke-test `@wp-playground/cli` pin bumps before tagging — a bad pin fans out to every plugin.

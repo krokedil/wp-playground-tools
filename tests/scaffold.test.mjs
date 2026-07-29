@@ -7,7 +7,12 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { inferSlug, scaffold } from '../src/init/scaffold.mjs';
+import {
+	CLAUDE_MD_BEGIN,
+	CLAUDE_MD_END,
+	inferSlug,
+	scaffold,
+} from '../src/init/scaffold.mjs';
 
 /**
  * Create a bare fake plugin checkout.
@@ -83,6 +88,34 @@ test('scaffold writes shim, config, pins, scripts, launch entries and ignores', 
 		fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
 		/\.playground\//
 	);
+
+	const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
+	assert.ok(
+		claude.includes(CLAUDE_MD_BEGIN) && claude.includes(CLAUDE_MD_END)
+	);
+	assert.match(claude, /\.playground\/proxy-url\.txt/);
+	assert.match(claude, /playground:start.*:8880/);
+});
+
+test('scaffold upserts the CLAUDE.md section without touching the rest', async (t) => {
+	const root = makePluginRoot(t);
+	fs.writeFileSync(
+		path.join(root, 'CLAUDE.md'),
+		'# My Plugin\n\nHand-written notes.\n'
+	);
+	await scaffold(root, []);
+
+	let claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
+	assert.match(claude, /^# My Plugin\n\nHand-written notes\./);
+	assert.ok(claude.includes(CLAUDE_MD_BEGIN));
+
+	// A refresh replaces the section in place — no duplicates, notes intact.
+	fs.appendFileSync(path.join(root, 'CLAUDE.md'), '\nTrailing notes.\n');
+	await scaffold(root, ['--update']);
+	claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
+	assert.equal(claude.split(CLAUDE_MD_BEGIN).length, 2);
+	assert.match(claude, /Hand-written notes\./);
+	assert.match(claude, /Trailing notes\./);
 });
 
 test('scaffold is idempotent and never overwrites the config', async (t) => {

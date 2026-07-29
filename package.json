@@ -24,8 +24,16 @@
 	],
 	"scripts": {
 		"test": "node --test tests/*.test.mjs",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --write \"**/*.mjs\"",
+		"format:check": "prettier --check \"**/*.mjs\"",
+		"sandbox:start": "cd sandbox && node ../src/cli.mjs start",
+		"sandbox:http": "cd sandbox && node ../src/cli.mjs server development",
+		"sandbox:https": "cd sandbox && node ../src/cli.mjs server development --https --port=9881",
+		"sandbox:ngrok": "cd sandbox && node ../src/cli.mjs server development --tunnel"
 	},
+	"prettier": "@wordpress/prettier-config",
 	"engines": {
 		"node": ">=20.19.0 <21",
 		"pnpm": ">=9.13.0"
@@ -45,6 +53,7 @@
 	},
 	"devDependencies": {
 		"@wordpress/eslint-plugin": "^25.0.0",
+		"@wordpress/prettier-config": "^4.0.0",
 		"eslint": "^9.39.4",
 		"prettier": "^3.6.0"
 	}
