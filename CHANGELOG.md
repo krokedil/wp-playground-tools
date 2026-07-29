@@ -26,6 +26,29 @@
   `.claude/launch.json`) with tab indentation; the existing indentation is now
   detected and preserved (tabs remain the default for new files). (Observed
   onboarding klarna-payments-for-woocommerce.)
+- Package-manager detection, mirroring Krokedil CI: the Node manager is read
+  from package.json's `packageManager` (fallback `devEngines.packageManager`,
+  string or object form) — pnpm iff declared, npm otherwise; lockfile presence
+  is intentionally ignored (`src/pm.mjs`, kept byte-compatible with
+  krokedil-wp-ci's `build-plugin.js`). Installs and builds run with the
+  detected manager: `pnpm install --frozen-lockfile` / `npm ci`, each with a
+  lockfile-repairing fallback, and `<pm> run <build>`.
+- Fix: `init` no longer stamps `packageManager: "pnpm@…"` / `engines.pnpm`
+  onto an existing package.json without a declaration — absence of the field
+  is what makes the centralized CI build with npm, so the stamp silently
+  flipped npm plugins' CI to pnpm (where `--frozen-lockfile` fails with no
+  pnpm-lock.yaml). Fresh scaffolds (init creates the package.json) still
+  default to pnpm. `.npmrc use-node-version` is now written for pnpm plugins
+  only, launch entries and the CLAUDE.md section use the detected manager
+  (including npm's mandatory `--` flag separator).
+- Bootstrap shim v2: self-detects the manager with the same rule (inline —
+  it runs pre-install) and installs via `npm ci`/`npm install` on npm
+  plugins. Existing consumers pick it up with `init --update`; npm plugins
+  stamped by older inits must also delete the stamped `packageManager` +
+  `engines.pnpm` by hand (see docs/onboarding.md).
+- Provisioning on too-old Node (< 20.19) only attempts the `pnpm exec node`
+  repin for pnpm-managed plugins (or when already running under pnpm);
+  npm plugins get an `nvm use` message instead.
 
 ## 1.1.1 — 2026-07-29
 
