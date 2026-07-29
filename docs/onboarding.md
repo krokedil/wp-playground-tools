@@ -13,7 +13,10 @@ Step-by-step guide for adopting `@krokedil/wp-playground-tools` in a plugin repo
 ```sh
 pnpm add -D "@krokedil/wp-playground-tools@github:krokedil/wp-playground-tools#semver:^1"
 pnpm exec krokedil-playground init
+pnpm install
 ```
+
+`pnpm add` resolves the `#semver:^1` range (you get the newest `v1.x.y` tag) but saves the dependency in `package.json` **without** it — a bare git URL that would track the default branch instead of releases. `init` corrects the saved spec back to `#semver:^1`, and the trailing `pnpm install` realigns the lockfile with it (skipping it fails `--frozen-lockfile` installs later).
 
 `init` is idempotent and writes/merges the files listed in the [README install section](../README.md#install-per-plugin): the `tools/playground.mjs` shim, a starter `playground.config.mjs` (yours to edit — never overwritten), `package.json` scripts, `.claude/launch.json` preview entries, a marker-delimited "WP Playground" section in the plugin's `CLAUDE.md`, the Node pin, and ignore entries.
 

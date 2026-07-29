@@ -11,6 +11,7 @@ import {
 	CLAUDE_MD_BEGIN,
 	CLAUDE_MD_END,
 	inferSlug,
+	PACKAGE_SPEC,
 	scaffold,
 } from '../src/init/scaffold.mjs';
 
@@ -270,6 +271,40 @@ test('scaffold preserves existing JSON indentation, defaults to tabs', async (t)
 		fs.readFileSync(path.join(bare, 'package.json'), 'utf8'),
 		/^\t"name"/m
 	);
+});
+
+test('scaffold restores the #semver range pnpm add drops, keeps deliberate pins', async (t) => {
+	// `pnpm add …#semver:^1` resolves the range but saves the normalized
+	// branch-tracking spec — init must correct it back to PACKAGE_SPEC.
+	const root = makePluginRoot(t);
+	const pkgPath = path.join(root, 'package.json');
+	fs.writeFileSync(
+		pkgPath,
+		JSON.stringify({
+			name: 'my-payment-gateway-dev',
+			private: true,
+			version: '0.0.0',
+			devDependencies: {
+				'@krokedil/wp-playground-tools':
+					'git+https://github.com/krokedil/wp-playground-tools.git',
+			},
+		}) + '\n'
+	);
+	await scaffold(root, []);
+	let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	assert.equal(
+		pkg.devDependencies['@krokedil/wp-playground-tools'],
+		PACKAGE_SPEC
+	);
+
+	// A spec with an explicit #committish is a deliberate pin — untouched,
+	// including on --update.
+	const pinned = 'github:krokedil/wp-playground-tools#main';
+	pkg.devDependencies['@krokedil/wp-playground-tools'] = pinned;
+	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
+	await scaffold(root, ['--update']);
+	pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	assert.equal(pkg.devDependencies['@krokedil/wp-playground-tools'], pinned);
 });
 
 test('scaffold --update respects a custom basePort from the config', async (t) => {

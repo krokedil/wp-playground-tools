@@ -241,9 +241,23 @@ export async function scaffold(root, args) {
 		}
 	}
 	pkg.devDependencies = pkg.devDependencies ?? {};
-	if (!pkg.devDependencies['@krokedil/wp-playground-tools']) {
+	const depSpec = pkg.devDependencies['@krokedil/wp-playground-tools'];
+	if (!depSpec) {
 		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
 		scriptsChanged = true;
+	} else if (
+		/krokedil\/wp-playground-tools(\.git)?$/.test(depSpec) &&
+		!depSpec.includes('#')
+	) {
+		// `pnpm add` resolves the #semver:^1 range but saves the spec
+		// normalized to the bare git URL, which tracks the default branch.
+		// A spec without a #committish is that accident — restore the
+		// tag-following range. Deliberate pins (#main, #v1.2.3) are kept.
+		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
+		scriptsChanged = true;
+		log(
+			`corrected the dev dependency spec to ${PACKAGE_SPEC} (pnpm add saves it without the #semver range)`
+		);
 	}
 	pkg.engines = {
 		...(pkg.engines ?? {}),
