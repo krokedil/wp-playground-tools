@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Fix: `init` now restores the `#semver:^1` range on the dev dependency spec
+  when `pnpm add` saved it as a bare branch-tracking git URL (pnpm normalizes
+  the spec on save — all versions, 9 through 11). Deliberate `#committish`
+  pins are left untouched. Install docs now end with a `pnpm install` to
+  realign the lockfile. (Found onboarding klarna-payments-for-woocommerce.)
+
 ## 1.1.1 — 2026-07-29
 
 - Fix: `pnpm exec krokedil-playground …` was a silent no-op under pnpm — the
