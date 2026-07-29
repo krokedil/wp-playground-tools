@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Private options (API keys) via env vars: zero-dependency `.env` loading at the
+  plugin root (ambient env wins; linked git worktrees fall back to the main
+  checkout's `.env`) and an `envSecret()` helper for configs — missing/empty
+  vars warn by name and omit the option instead of failing the boot.
 - Parallel-worktree tunnels: `--tunnel-domain=<host|none>` overrides the
   committed `tunnel.domain` per run (second reserved domain, or an ephemeral
   URL); `tunnel.domain` is validated as a bare hostname; ngrok failures now
