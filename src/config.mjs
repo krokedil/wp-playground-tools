@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { applyEnvFile } from './env.mjs';
+
 export const CONFIG_FILENAME = 'playground.config.mjs';
 
 /** Server modes the composer knows how to build blueprints for. */
@@ -235,6 +237,9 @@ export async function loadConfig(root) {
 			`not found at ${file}. Run "krokedil-playground init" to scaffold one.`
 		);
 	}
+	// Private options: the config module reads secrets from process.env, so
+	// .env must be merged before the import evaluates it.
+	applyEnvFile(root);
 	// Cache-bust: the config may be rewritten between loads in one process
 	// (init --update, tests) and ESM caches modules by URL.
 	const mod = await import(

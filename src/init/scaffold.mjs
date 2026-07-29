@@ -298,6 +298,7 @@ export async function scaffold(root, args) {
 		ensureLines(path.join(root, '.gitignore'), [
 			'.playground/',
 			'/pr-screenshots/',
+			'.env',
 		])
 	) {
 		log('appended .gitignore entries');
@@ -309,6 +310,7 @@ export async function scaffold(root, args) {
 				'.playground',
 				'.playground/**/*',
 				'playground.config.mjs',
+				'.env',
 			])
 		) {
 			log('appended .kernlignore entries');

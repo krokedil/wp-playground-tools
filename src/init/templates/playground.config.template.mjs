@@ -20,6 +20,12 @@ export default {
 	// Options seeded on every provisioned site (per-mode: development/demo/e2e).
 	// options: { all: { my_plugin_enabled: 'yes' } },
 
+	// Private option values (API keys) come from env vars: a gitignored .env at
+	// the plugin root locally, repo secrets in CI. See "Private options" in the
+	// tooling README. At the top of this file:
+	//   import { envSecret } from '@krokedil/wp-playground-tools';
+	// options: { all: { my_gateway_settings: { test_secret: envSecret('MY_TEST_SECRET') } } },
+
 	// Pages created on provisioning.
 	// pages: { all: [ { title: 'Checkout Test', slug: 'checkout-test', content: '<!-- wp:shortcode -->[my_shortcode]<!-- /wp:shortcode -->' } ] },
 

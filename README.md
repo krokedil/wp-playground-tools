@@ -63,7 +63,7 @@ export default {
 	woocommerce: true,                       // install WC + org baseline store options
 	store: { country: 'SE', currency: 'SEK', timezone: 'Europe/Stockholm' },
 	activate: ['my-plugin'],                 // plugins activated after install (default: [slug])
-	options: { all: {…}, development: {…}, demo: {…}, e2e: {…} },   // seeded options (per-mode, `all` merges under each)
+	options: { all: {…}, development: {…}, demo: {…}, e2e: {…} },   // seeded options (per-mode, `all` merges under each; secrets via envSecret() — see below)
 	pages: { all: […], development: […] },   // pages created on provisioning ({ title, slug, content })
 	muPlugins: { development: ['tools/my-dev-helper.php'] },        // plugin-local mu-plugins staged + linked
 	seedData: 'tools/seed-data.json',        // development WC fixture; default: the package's SE fixture
@@ -77,6 +77,45 @@ export default {
 ```
 
 Schema-creep rule: new config keys only for things **three or more plugins** need. Everything else is `extraSteps` (raw [blueprint steps](https://wordpress.github.io/wordpress-playground/blueprints/steps)).
+
+## Private options (API keys)
+
+Non-public option values (API keys, merchant IDs, shared secrets) never go in `playground.config.mjs` — they come from env vars, read in the config via `envSecret()`:
+
+```js
+import { envSecret } from '@krokedil/wp-playground-tools';
+
+export default {
+	// …
+	options: {
+		all: {
+			woocommerce_klarna_settings: {
+				enabled: 'yes',
+				testmode: 'yes',
+				test_merchant_id: envSecret('KLARNA_TEST_MERCHANT_ID'),
+				test_shared_secret: envSecret('KLARNA_TEST_SHARED_SECRET'),
+			},
+		},
+	},
+};
+```
+
+**Locally**: put the values in a gitignored `.env` at the plugin root (`NAME=value`; quotes, multi-line quoted values and `export` prefixes work). The tool loads it before evaluating the config. Already-set environment always wins over the file, and the tool never stores or prints values — warnings name variables only. Keep a committed `.env.example` with blank values so the needed names are discoverable.
+
+**Git worktrees**: untracked files don't transfer into worktrees, so the main checkout's `.env` is found and used automatically from any linked worktree. Add a worktree-local `.env` only to override specific values (precedence: ambient env > worktree `.env` > main checkout `.env`).
+
+**CI**: store the values as GitHub repo secrets and map them onto the step that runs the playground:
+
+```yaml
+- run: pnpm run playground:server-development
+  env:
+    KLARNA_TEST_MERCHANT_ID: ${{ secrets.KLARNA_TEST_MERCHANT_ID }}
+    KLARNA_TEST_SHARED_SECRET: ${{ secrets.KLARNA_TEST_SHARED_SECRET }}
+```
+
+A missing or empty variable (GitHub renders absent/fork-PR secrets as empty strings) prints one warning naming it, the option key is omitted, and the site boots unconfigured — provisioning never fails over a missing secret. Per-mode keys (test vs. prod) use the existing per-mode `options` shape.
+
+⚠ Resolved values land in `.playground/blueprint.<mode>.json` (gitignored + kernlignored) and in the persistent site's SQLite database — use **sandbox/test credentials only**, never production keys. The persistent `start` site only re-reads secrets on provisioning: after changing one, run `start --fresh` (`server` modes reprovision every run).
 
 ## HTTPS
 

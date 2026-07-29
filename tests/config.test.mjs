@@ -2,8 +2,15 @@
  * Tests for config normalization and validation in src/config.mjs.
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { normalizeConfig, validateTunnelDomain } from '../src/config.mjs';
+import {
+	loadConfig,
+	normalizeConfig,
+	validateTunnelDomain,
+} from '../src/config.mjs';
 
 test('slug is required and validated', () => {
 	assert.throws(() => normalizeConfig({}), /"slug" is required/);
@@ -125,6 +132,34 @@ test('validateTunnelDomain accepts hostnames and names the failing setting', () 
 		() => validateTunnelDomain('nodots', '--tunnel-domain'),
 		/"--tunnel-domain" must be a bare hostname/
 	);
+});
+
+test('loadConfig merges .env before evaluating the config, ambient env wins', async (t) => {
+	t.mock.method(process.stderr, 'write', () => true);
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-cfg-env-'));
+	t.after(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+		delete process.env.PG_TEST_FROM_FILE;
+		delete process.env.PG_TEST_AMBIENT;
+	});
+
+	process.env.PG_TEST_AMBIENT = 'from-shell';
+	fs.writeFileSync(
+		path.join(root, '.env'),
+		'PG_TEST_FROM_FILE=file-secret\nPG_TEST_AMBIENT=file-loses\n'
+	);
+	fs.writeFileSync(
+		path.join(root, 'playground.config.mjs'),
+		"export default {\n\tslug: 'env-plugin',\n" +
+			'\toptions: { all: {\n' +
+			'\t\tfrom_file: process.env.PG_TEST_FROM_FILE,\n' +
+			'\t\tambient: process.env.PG_TEST_AMBIENT,\n' +
+			'\t} },\n};\n'
+	);
+
+	const config = await loadConfig(root);
+	assert.equal(config.options.development.from_file, 'file-secret');
+	assert.equal(config.options.development.ambient, 'from-shell');
 });
 
 test('store overrides merge over org defaults', () => {

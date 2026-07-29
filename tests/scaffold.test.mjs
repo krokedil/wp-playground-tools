@@ -41,6 +41,7 @@ test('inferSlug prefers the main plugin file over the directory name', (t) => {
 
 test('scaffold writes shim, config, pins, scripts, launch entries and ignores', async (t) => {
 	const root = makePluginRoot(t);
+	fs.writeFileSync(path.join(root, '.kernlignore'), 'node_modules\n');
 	await scaffold(root, []);
 
 	assert.ok(fs.existsSync(path.join(root, 'tools', 'playground.mjs')));
@@ -84,10 +85,15 @@ test('scaffold writes shim, config, pins, scripts, launch entries and ignores', 
 	assert.ok(names.includes('playground-my-payment-gateway-start'));
 	assert.ok(launch.configurations.every((c) => c.autoPort === true));
 
-	assert.match(
-		fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
-		/\.playground\//
+	const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+	assert.match(gitignore, /\.playground\//);
+	assert.match(gitignore, /^\.env$/m);
+	const kernlignore = fs.readFileSync(
+		path.join(root, '.kernlignore'),
+		'utf8'
 	);
+	assert.match(kernlignore, /^playground\.config\.mjs$/m);
+	assert.match(kernlignore, /^\.env$/m);
 
 	const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
 	assert.ok(

@@ -293,3 +293,30 @@ test('composeAndStage fails actionably on a missing mu-plugin', async (t) => {
 		/mu-plugin not found.*config\.muPlugins/s
 	);
 });
+
+test('undefined option values (missing secrets) drop out of the staged blueprint', async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-compose-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	const config = normalizeConfig({
+		slug: 'a-plugin',
+		options: {
+			all: {
+				my_gateway_settings: {
+					enabled: 'yes',
+					// What envSecret() returns for an unset variable.
+					test_secret: undefined,
+				},
+			},
+		},
+	});
+	await composeAndStage(root, config, 'development');
+	const staged = JSON.parse(
+		fs.readFileSync(
+			path.join(root, '.playground', 'blueprint.development.json'),
+			'utf8'
+		)
+	);
+	const options = effectiveOptions(staged);
+	assert.deepEqual(options.my_gateway_settings, { enabled: 'yes' });
+	assert.ok(!JSON.stringify(staged).includes('test_secret'));
+});
