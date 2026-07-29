@@ -35,6 +35,10 @@ jobs:
         with:
           path: wp-playground-tools
       - uses: pnpm/action-setup@v4
+        with:
+          # The repo is checked out into a subdirectory, so the action can't
+          # find the packageManager field at the workspace root on its own.
+          package_json_file: wp-playground-tools/package.json
       - uses: actions/setup-node@v4
         with:
           node-version-file: wp-playground-tools/.nvmrc

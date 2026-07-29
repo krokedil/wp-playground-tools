@@ -20,7 +20,7 @@ Initial release, extracted from returns-and-withdrawals' `tools/` setup.
   `.claude/launch.json` preview entries — no consumer repo needed. The sandbox
   dashboard widget and `GET /wp-json/krokedil-sandbox/v1/ping` echo transport
   diagnostics. `ensurePrereqs` skips `pnpm install` for roots without a
-  `package.json`.
+  `package.json`, and fails actionably when `build` is configured without one.
 - Dev tooling: `CLAUDE.md`, prettier (`format`/`format:check`,
   `@wordpress/prettier-config`), `.editorconfig`, `lint:fix`, and `php -l`
   over all shipped PHP in CI.

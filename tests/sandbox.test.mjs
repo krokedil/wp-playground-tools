@@ -5,6 +5,7 @@
  * (sandbox/ has no package.json of its own).
  */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,6 +48,32 @@ test('sandbox blueprints compose for every configured server mode', () => {
 			json.includes('plugin activate krokedil-playground-sandbox'),
 			`${mode}: the sandbox plugin is activated`
 		);
+	}
+});
+
+test('ensurePrereqs fails actionably when "build" is set without package.json', () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-sandbox-build-'));
+	const prepareUrl = new URL('../src/prepare.mjs', import.meta.url).href;
+	try {
+		// fail() exits the process, so run the guard in a subprocess.
+		const res = spawnSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'-e',
+				`import { ensurePrereqs } from '${prepareUrl}';
+				ensurePrereqs(process.argv[1], {
+					composer: null,
+					build: { markers: ['build/index.js'], command: 'build' },
+				}, false);`,
+				dir,
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(res.status, 1);
+		assert.match(res.stderr, /declares "build".*no package\.json/);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
 

@@ -319,6 +319,14 @@ export function ensurePrereqs(root, config, provisioning) {
 		}
 	}
 
+	// A configured build without package.json can never work — fail with a
+	// config-level message instead of a raw pnpm error further down.
+	if (config.build && !exists('package.json')) {
+		fail(
+			'playground.config.mjs declares "build" but the plugin has no package.json — remove "build" or add the JS tooling it expects.'
+		);
+	}
+
 	// No package.json means no Node dependencies to install (the sandbox
 	// plugin, or a consumer with no JS tooling at all).
 	if (exists('package.json') && !exists('node_modules')) {
