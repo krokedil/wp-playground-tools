@@ -315,8 +315,18 @@ function pm(root, manager, argv, what) {
  * @param {string} root Plugin root.
  */
 function warnIfComposerLacksGithubToken(root) {
-	if (process.env.COMPOSER_AUTH) {
-		return;
+	// COMPOSER_AUTH counts only when it actually carries a github.com token —
+	// it may hold auth for other hosts only (then the warnings still appear).
+	try {
+		if (
+			JSON.parse(process.env.COMPOSER_AUTH ?? '')?.['github-oauth']?.[
+				'github.com'
+			]
+		) {
+			return;
+		}
+	} catch {
+		// Unset or invalid JSON — fall through to the config probes.
 	}
 	const probe = (args) =>
 		spawnSync('composer', ['config', ...args, 'github-oauth.github.com'], {
