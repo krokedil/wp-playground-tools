@@ -170,10 +170,19 @@ async function runMode(root, modeName, args) {
 }
 
 // Only run when executed directly (bin), not when imported (shim calls main()).
-if (
-	process.argv[1] &&
-	import.meta.url ===
-		(await import('node:url')).pathToFileURL(process.argv[1]).href
-) {
-	await main();
+// Compare realpaths: pnpm bin stubs pass a node_modules symlink as argv[1]
+// while import.meta.url is already resolved, so a plain comparison silently
+// no-ops every `pnpm exec krokedil-playground …` invocation.
+if (process.argv[1]) {
+	const { pathToFileURL } = await import('node:url');
+	const { realpathSync } = await import('node:fs');
+	let entry = process.argv[1];
+	try {
+		entry = realpathSync(entry);
+	} catch {
+		// argv[1] not resolvable — keep it verbatim.
+	}
+	if (import.meta.url === pathToFileURL(entry).href) {
+		await main();
+	}
 }
