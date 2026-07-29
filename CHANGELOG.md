@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fix: `pnpm exec krokedil-playground …` was a silent no-op under pnpm — the
+  bin stub passes a node_modules symlink as argv[1], so the direct-execution
+  guard never matched; entry paths are now realpath-compared. (Found
+  onboarding klarna-payments-for-woocommerce.)
+
 ## 1.1.0 — 2026-07-29
 
 - Private options (API keys) via env vars: zero-dependency `.env` loading at the
