@@ -109,6 +109,18 @@ function ensureLines(file, lines) {
 }
 
 /**
+ * Detect the indentation used in a JSON file so a rewrite doesn't reformat
+ * every line: the whitespace prefix of the first indented line, tab when
+ * there is none (new files).
+ *
+ * @param {string|null} content File content, or null when the file is new.
+ * @return {string} The indent string.
+ */
+function detectIndent(content) {
+	return content?.match(/^([ \t]+)\S/m)?.[1] ?? '\t';
+}
+
+/**
  * Run the scaffold.
  *
  * @param {string}   root Plugin root (cwd).
@@ -203,14 +215,18 @@ export async function scaffold(root, args) {
 
 	// --- package.json (merged) ---
 	const pkgPath = path.join(root, 'package.json');
-	const pkg = fs.existsSync(pkgPath)
-		? JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
-		: {
-				name: `${slug}-dev`,
-				private: true,
-				type: 'module',
-				version: '0.0.0',
-			};
+	const pkgRaw = fs.existsSync(pkgPath)
+		? fs.readFileSync(pkgPath, 'utf8')
+		: null;
+	const pkg =
+		pkgRaw !== null
+			? JSON.parse(pkgRaw)
+			: {
+					name: `${slug}-dev`,
+					private: true,
+					type: 'module',
+					version: '0.0.0',
+				};
 	pkg.scripts = pkg.scripts ?? {};
 	const scripts = {
 		...Object.fromEntries(modes.map((mode) => MODE_SCRIPTS[mode])),
@@ -235,9 +251,23 @@ export async function scaffold(root, args) {
 		}
 	}
 	pkg.devDependencies = pkg.devDependencies ?? {};
-	if (!pkg.devDependencies['@krokedil/wp-playground-tools']) {
+	const depSpec = pkg.devDependencies['@krokedil/wp-playground-tools'];
+	if (!depSpec) {
 		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
 		scriptsChanged = true;
+	} else if (
+		/krokedil\/wp-playground-tools(\.git)?$/.test(depSpec) &&
+		!depSpec.includes('#')
+	) {
+		// `pnpm add` resolves the #semver:^1 range but saves the spec
+		// normalized to the bare git URL, which tracks the default branch.
+		// A spec without a #committish is that accident — restore the
+		// tag-following range. Deliberate pins (#main, #v1.2.3) are kept.
+		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
+		scriptsChanged = true;
+		log(
+			`corrected the dev dependency spec to ${PACKAGE_SPEC} (pnpm add saves it without the #semver range)`
+		);
 	}
 	pkg.engines = {
 		...(pkg.engines ?? {}),
@@ -245,7 +275,10 @@ export async function scaffold(root, args) {
 		pnpm: pkg.engines?.pnpm ?? '>=9.13.0',
 	};
 	pkg.packageManager = pkg.packageManager ?? 'pnpm@9.15.9';
-	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
+	fs.writeFileSync(
+		pkgPath,
+		JSON.stringify(pkg, null, detectIndent(pkgRaw)) + '\n'
+	);
 	if (scriptsChanged) {
 		log(
 			'merged package.json (scripts, dev dependency, engines) — run pnpm install'
@@ -254,9 +287,13 @@ export async function scaffold(root, args) {
 
 	// --- .claude/launch.json (playground entries replaced, others preserved) ---
 	const launchPath = path.join(root, '.claude', 'launch.json');
-	const launch = fs.existsSync(launchPath)
-		? JSON.parse(fs.readFileSync(launchPath, 'utf8'))
-		: { version: '0.0.1', configurations: [] };
+	const launchRaw = fs.existsSync(launchPath)
+		? fs.readFileSync(launchPath, 'utf8')
+		: null;
+	const launch =
+		launchRaw !== null
+			? JSON.parse(launchRaw)
+			: { version: '0.0.1', configurations: [] };
 	launch.configurations = (launch.configurations ?? []).filter(
 		(c) => !/^playground-/.test(c.name ?? '')
 	);
@@ -270,7 +307,10 @@ export async function scaffold(root, args) {
 		});
 	}
 	fs.mkdirSync(path.dirname(launchPath), { recursive: true });
-	fs.writeFileSync(launchPath, JSON.stringify(launch, null, '\t') + '\n');
+	fs.writeFileSync(
+		launchPath,
+		JSON.stringify(launch, null, detectIndent(launchRaw)) + '\n'
+	);
 	log('wrote .claude/launch.json preview entries');
 
 	// --- CLAUDE.md section (generated between markers, rest preserved) ---
