@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Parallel-worktree tunnels: `--tunnel-domain=<host|none>` overrides the
+  committed `tunnel.domain` per run (second reserved domain, or an ephemeral
+  URL); `tunnel.domain` is validated as a bare hostname; ngrok failures now
+  surface the agent's own error lines plus actionable hints for the common
+  `ERR_NGROK_*` codes (authtoken, session limit, domain conflicts).
 - Standalone dogfooding: committed `sandbox/` plugin + config, `sandbox:*`
   scripts (http / https / ngrok / persistent start on basePort 9880) and
   `.claude/launch.json` preview entries — no consumer repo needed. The sandbox
@@ -34,11 +39,6 @@ Initial release, extracted from returns-and-withdrawals' `tools/` setup.
   seeding), staged with runtime assets under `.playground/`.
 - `--tunnel` (ngrok, pluggable) and `--https` (mkcert + local reverse proxy)
   via the `playground-proxy-url.php` runtime mu-plugin — no DB writes.
-- Parallel-worktree tunnels: `--tunnel-domain=<host|none>` overrides the
-  committed `tunnel.domain` per run (second reserved domain, or an ephemeral
-  URL); `tunnel.domain` is validated as a bare hostname; ngrok failures now
-  surface the agent's own error lines plus actionable hints for the common
-  `ERR_NGROK_*` codes (authtoken, session limit, domain conflicts).
 - PR screenshot + collage engine (Playwright) driven by a per-plugin manifest.
 - `init` scaffolder for onboarding plugins (`--update` refreshes generated files).
 - Changes vs the original in-plugin tooling: env vars renamed `RWWC_*` →
