@@ -21,9 +21,20 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { CONFIG_FILENAME, MODE_PORT_OFFSETS } from '../config.mjs';
+import { CONFIG_FILENAME, MODE_PORT_OFFSETS, loadConfig } from '../config.mjs';
 
 const TEMPLATES = fileURLToPath(new URL('./templates', import.meta.url));
+
+/** package.json script name + command per mode (drives launch.json too). */
+const MODE_SCRIPTS = {
+	start: ['playground:start', 'node tools/playground.mjs start'],
+	development: [
+		'playground:server-development',
+		'node tools/playground.mjs server development',
+	],
+	demo: ['playground:server-demo', 'node tools/playground.mjs server demo'],
+	e2e: ['playground:server-e2e', 'node tools/playground.mjs server e2e'],
+};
 
 /** The Node version pin stamped into consumers (kept next to nodeSatisfiesPin). */
 export const NODE_PIN = '20.19.0';
@@ -142,6 +153,15 @@ export async function scaffold(root, args) {
 		log(`wrote ${CONFIG_FILENAME} (slug: ${slug} — review it!)`);
 	}
 
+	// --- resolve the config (drives the scripts + launch entries below) ---
+	let basePort = 8880;
+	let modes = ['start', 'development', 'demo'];
+	try {
+		({ basePort, modes } = await loadConfig(root));
+	} catch {
+		// Starter config not filled in yet — defaults.
+	}
+
 	// --- node pins (generated) ---
 	const nvmrc = path.join(root, '.nvmrc');
 	if (!fs.existsSync(nvmrc) || update) {
@@ -183,10 +203,7 @@ export async function scaffold(root, args) {
 			};
 	pkg.scripts = pkg.scripts ?? {};
 	const scripts = {
-		'playground:start': 'node tools/playground.mjs start',
-		'playground:server-development':
-			'node tools/playground.mjs server development',
-		'playground:server-demo': 'node tools/playground.mjs server demo',
+		...Object.fromEntries(modes.map((mode) => MODE_SCRIPTS[mode])),
 		'playground:setup': 'node tools/playground.mjs setup',
 		screenshots: 'node tools/playground.mjs screenshots',
 	};
@@ -195,6 +212,16 @@ export async function scaffold(root, args) {
 		if (pkg.scripts[name] !== cmd && (update || !pkg.scripts[name])) {
 			pkg.scripts[name] = cmd;
 			scriptsChanged = true;
+		}
+	}
+	// --update also prunes generated scripts for modes dropped from the
+	// config — but only untouched ones, so customized scripts survive.
+	if (update) {
+		for (const [mode, [name, cmd]] of Object.entries(MODE_SCRIPTS)) {
+			if (!modes.includes(mode) && pkg.scripts[name] === cmd) {
+				delete pkg.scripts[name];
+				scriptsChanged = true;
+			}
 		}
 	}
 	pkg.devDependencies = pkg.devDependencies ?? {};
@@ -217,28 +244,17 @@ export async function scaffold(root, args) {
 
 	// --- .claude/launch.json (playground entries replaced, others preserved) ---
 	const launchPath = path.join(root, '.claude', 'launch.json');
-	let basePort = 8880;
-	try {
-		const { loadConfig } = await import('../config.mjs');
-		basePort = (await loadConfig(root)).basePort;
-	} catch {
-		// Starter config not filled in yet — default port.
-	}
 	const launch = fs.existsSync(launchPath)
 		? JSON.parse(fs.readFileSync(launchPath, 'utf8'))
 		: { version: '0.0.1', configurations: [] };
 	launch.configurations = (launch.configurations ?? []).filter(
 		(c) => !/^playground-/.test(c.name ?? '')
 	);
-	for (const [mode, script] of [
-		['start', 'playground:start'],
-		['development', 'playground:server-development'],
-		['demo', 'playground:server-demo'],
-	]) {
+	for (const mode of modes) {
 		launch.configurations.push({
 			name: `playground-${slug}-${mode}`,
 			runtimeExecutable: 'pnpm',
-			runtimeArgs: ['run', script],
+			runtimeArgs: ['run', MODE_SCRIPTS[mode][0]],
 			port: basePort + MODE_PORT_OFFSETS[mode],
 			autoPort: true,
 		});

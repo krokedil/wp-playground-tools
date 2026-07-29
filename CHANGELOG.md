@@ -30,6 +30,16 @@
 - CI: fixed the smoke job's pnpm setup (the subdirectory checkout hid the
   `packageManager` field from `pnpm/action-setup`) — the job now actually
   boots the fixture plugin.
+- `init` derives scripts and `.claude/launch.json` entries from `config.modes`,
+  so opting into e2e (+ `init --update`) adds `playground:server-e2e` and its
+  preview entry.
+- Loud stderr warning when `basePort` is unset — the 8880 fallback collides
+  with returns-and-withdrawals' claimed port. **Follow-up for rwwc:** add
+  `basePort: 8880` to its `playground.config.mjs` to silence the warning.
+- Docs: step-by-step onboarding guide (`docs/onboarding.md`) and a reference
+  for seed data, the screenshots manifest, and env vars (`docs/reference.md`);
+  `playground-seeder.php`'s header now documents the package's auto-staging
+  instead of the stale rwwc-era copy/symlink instructions.
 
 ## 1.0.0 — 2026-07-29
 
@@ -44,7 +54,8 @@ Initial release, extracted from returns-and-withdrawals' `tools/` setup.
 - `--tunnel` (ngrok, pluggable) and `--https` (mkcert + local reverse proxy)
   via the `playground-proxy-url.php` runtime mu-plugin — no DB writes.
 - PR screenshot + collage engine (Playwright) driven by a per-plugin manifest.
-- `init` scaffolder for onboarding plugins (`--update` refreshes generated files).
+- `init` scaffolder for onboarding plugins (`--update` refreshes generated
+  files).
 - Changes vs the original in-plugin tooling: env vars renamed `RWWC_*` →
   `KROKEDIL_PG_*`; `@wp-playground/cli@3.1.29` is a packaged dependency instead
   of an inline `npx` pin; the e2e blueprint is opt-in (`modes`); blueprint page

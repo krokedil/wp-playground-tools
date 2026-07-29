@@ -1,41 +1,29 @@
 <?php
 /**
  * Plugin Name: Playground Seeder
- * Description: Plugin-agnostic helpers for seeding tax classes, tax rates, products, and orders into a WordPress Playground site from a JSON definition file. Lives at tools/blueprints/ so any sibling blueprint that needs declarative seed data can symlink it into mu-plugins/ and pass the absolute path to its own playground-seeder-data.json. In this repo the development blueprint is the only consumer; demo/ and e2e/ provision their fixtures inline via runPHP + wp-cli steps.
+ * Description: Plugin-agnostic helpers for seeding tax classes, tax rates, products, and orders into a WordPress Playground site from a JSON definition file. Staged automatically by @krokedil/wp-playground-tools for WooCommerce development-mode blueprints; demo/e2e provision their fixtures inline via runPHP + wp-cli steps.
  * Version: 1.0.0
  *
  * @package Playground/Seeder
  *
  * Overview:
  * Declarative WooCommerce seeder for WP Playground (or any WP site). All data
- * lives in a sibling playground-seeder-data.json file that this seeder reads
- * once per request and caches in memory. Every seed function is idempotent —
- * existing entities are matched against the JSON (by SKU, code, name, slug,
- * country+class+rate, etc.) and skipped, so the blueprint can be re-run
- * without producing duplicates.
+ * lives in a JSON file whose path is passed to each seed function; the seeder
+ * reads it once per request and caches it in memory. Every seed function is
+ * idempotent — existing entities are matched against the JSON (by SKU, code,
+ * name, slug, country+class+rate, etc.) and skipped, so the blueprint can be
+ * re-run without producing duplicates.
  *
- * Use in a Playground blueprint:
- * The blueprint at tools/blueprints/development/blueprint.json shows the
- * pattern. In short:
- *   1. mkdir /wordpress/wp-content/mu-plugins
- *   2. symlink this file into mu-plugins so it auto-loads before regular
- *      plugins:
- *        symlink(
- *          '/wordpress/wp-content/plugins/<your-plugin>/tools/blueprints/playground-seeder.php',
- *          '/wordpress/wp-content/mu-plugins/playground-seeder.php'
- *        );
- *   3. After wp-load.php is required, call whichever playground_seed_*
- *      functions you need (typically all of them, in dependency order),
- *      passing the absolute path to your blueprint's JSON file as $path.
- *
- * Reuse in another plugin:
- *   1. Copy playground-seeder.php into that plugin's tools/blueprints/.
- *   2. Add an tools/blueprints/<env>/playground-seeder-data.json with the
- *      products / coupons / orders that env needs. The shape is documented
- *      below.
- *   3. In that plugin's blueprint, symlink the seeder into mu-plugins and
- *      call the seed functions from a runPHP step, passing the absolute
- *      path to the JSON.
+ * How it's wired (nothing for consumers to copy or symlink):
+ * The package stages this file into <plugin>/.playground/mu-plugins/ for
+ * development-mode blueprints and copies the fixture configured as
+ * `seedData` in playground.config.mjs (default: the package's generic
+ * SE fixture, assets/seed-data/default.json) to
+ * <plugin>/.playground/seed-data.json (src/blueprint/compose.mjs). The
+ * generated blueprint symlinks the staged mu-plugins into the site and calls
+ * the seed functions in dependency order with that JSON path
+ * (src/blueprint/steps.mjs, seedInvocation). Consumers only set `seedData`
+ * to a plugin-local JSON file with the shape documented below.
  *
  * JSON shape (top-level keys, all optional):
  *   tax_classes        Array of class names. Created via WC_Tax::create_tax_class().

@@ -8,10 +8,12 @@ export default {
 	// Where the persistent dev site lands after boot.
 	// landingPage: '/wp-admin/',
 
-	// Reserve a unique base port for this plugin in the org registry table
-	// (shared README) so concurrent plugin dev doesn't collide. Modes use
-	// basePort (start), +1 (development), +2 (demo), +3 (e2e).
-	// basePort: 8880,
+	// REQUIRED before first real use: claim a free row in the org port
+	// registry table (the package README) and set it here. Until you do, the
+	// tool warns and falls back to 8880 — a port another plugin already
+	// claims. Modes listen on basePort (start), +1 (development), +2 (demo),
+	// +3 (e2e); --https proxies on the live port +400.
+	// basePort: 8890,
 
 	// Plugins without composer.json / a JS build can delete these.
 	// composer: { markers: [ 'vendor/autoload.php' ] },

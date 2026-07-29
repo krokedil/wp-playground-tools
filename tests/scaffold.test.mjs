@@ -149,6 +149,83 @@ test('scaffold is idempotent and never overwrites the config', async (t) => {
 	);
 });
 
+test('scaffold --update derives scripts and launch entries from config.modes', async (t) => {
+	const root = makePluginRoot(t);
+	await scaffold(root, []);
+
+	const pkgPath = path.join(root, 'package.json');
+	assert.equal(
+		JSON.parse(fs.readFileSync(pkgPath, 'utf8')).scripts[
+			'playground:server-e2e'
+		],
+		undefined
+	);
+
+	fs.writeFileSync(
+		path.join(root, 'playground.config.mjs'),
+		"export default { slug: 'my-payment-gateway', basePort: 8890, modes: ['start', 'development', 'demo', 'e2e'] };\n"
+	);
+	await scaffold(root, ['--update']);
+
+	const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	assert.equal(
+		pkg.scripts['playground:server-e2e'],
+		'node tools/playground.mjs server e2e'
+	);
+
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	const entries = launch.configurations.filter((c) =>
+		/^playground-/.test(c.name)
+	);
+	assert.equal(entries.length, 4);
+	const e2e = entries.find((c) => /-e2e$/.test(c.name));
+	assert.equal(e2e.port, 8893);
+	assert.deepEqual(e2e.runtimeArgs, ['run', 'playground:server-e2e']);
+});
+
+test('scaffold --update prunes dropped-mode scripts but keeps customized ones', async (t) => {
+	const root = makePluginRoot(t);
+	const pkgPath = path.join(root, 'package.json');
+	await scaffold(root, []);
+
+	fs.writeFileSync(
+		path.join(root, 'playground.config.mjs'),
+		"export default { slug: 'my-payment-gateway', basePort: 8890, modes: ['start', 'development', 'demo', 'e2e'] };\n"
+	);
+	await scaffold(root, ['--update']);
+
+	// The dev drops e2e again but has customized its script — it must survive.
+	fs.writeFileSync(
+		path.join(root, 'playground.config.mjs'),
+		"export default { slug: 'my-payment-gateway', basePort: 8890, modes: ['start', 'development', 'demo'] };\n"
+	);
+	let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	pkg.scripts['playground:server-e2e'] = 'echo customized';
+	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
+
+	await scaffold(root, ['--update']);
+	pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	assert.equal(pkg.scripts['playground:server-e2e'], 'echo customized');
+
+	// An untouched generated script for a dropped mode is pruned.
+	pkg.scripts['playground:server-e2e'] =
+		'node tools/playground.mjs server e2e';
+	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
+
+	await scaffold(root, ['--update']);
+	pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	assert.equal(pkg.scripts['playground:server-e2e'], undefined);
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	assert.equal(
+		launch.configurations.filter((c) => /^playground-/.test(c.name)).length,
+		3
+	);
+});
+
 test('scaffold --update respects a custom basePort from the config', async (t) => {
 	const root = makePluginRoot(t);
 	await scaffold(root, []);

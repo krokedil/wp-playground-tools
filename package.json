@@ -19,6 +19,7 @@
 	"files": [
 		"src",
 		"assets",
+		"docs",
 		"README.md",
 		"CHANGELOG.md"
 	],

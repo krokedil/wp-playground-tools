@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import test from 'node:test';
 import {
 	loadConfig,
@@ -160,6 +161,28 @@ test('loadConfig merges .env before evaluating the config, ambient env wins', as
 	const config = await loadConfig(root);
 	assert.equal(config.options.development.from_file, 'file-secret');
 	assert.equal(config.options.development.ambient, 'from-shell');
+});
+
+test('loadConfig warns on a defaulted basePort, silent when set', async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-config-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	const file = path.join(root, 'playground.config.mjs');
+	const write = t.mock.method(process.stderr, 'write', () => true);
+
+	fs.writeFileSync(file, "export default { slug: 'a-plugin' };\n");
+	await loadConfig(root);
+	assert.ok(write.mock.calls.some((c) => /basePort/.test(c.arguments[0])));
+
+	write.mock.resetCalls();
+	fs.writeFileSync(
+		file,
+		"export default { slug: 'a-plugin', basePort: 8890 };\n"
+	);
+	// Force a distinct mtime — loadConfig's ESM cache-bust keys on it, and
+	// back-to-back writes can land in the same timestamp.
+	fs.utimesSync(file, new Date(), new Date(Date.now() + 1000));
+	await loadConfig(root);
+	assert.ok(!write.mock.calls.some((c) => /basePort/.test(c.arguments[0])));
 });
 
 test('store overrides merge over org defaults', () => {

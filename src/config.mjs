@@ -6,6 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { applyEnvFile } from './env.mjs';
@@ -245,6 +246,12 @@ export async function loadConfig(root) {
 	const mod = await import(
 		`${pathToFileURL(file).href}?mtime=${fs.statSync(file).mtimeMs}`
 	);
+	if ((mod.default?.basePort ?? null) === null) {
+		process.stderr.write(
+			'playground-config: "basePort" is not set — falling back to 8880, which other plugins may already claim. ' +
+				'Claim a row in the port registry table (package README) and set basePort in playground.config.mjs.\n'
+		);
+	}
 	return normalizeConfig(mod.default, {
 		hasComposerJson: fs.existsSync(path.join(root, 'composer.json')),
 	});

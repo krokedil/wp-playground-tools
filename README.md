@@ -2,6 +2,8 @@
 
 Shared WordPress Playground dev tooling for Krokedil WooCommerce plugins: one-command bootstrap, worktree-isolated persistent sites, generated blueprints, declarative WC seeding, PR screenshots, and HTTPS via an ngrok tunnel or a local mkcert proxy.
 
+Onboarding a new plugin? Follow the step-by-step guide in [docs/onboarding.md](docs/onboarding.md). Seed-data / screenshots / env-var reference: [docs/reference.md](docs/reference.md).
+
 ## Install (per plugin)
 
 ```sh
@@ -36,6 +38,7 @@ pnpm run playground:start [-- is never needed — pnpm forwards flags directly]
 pnpm run playground:start --fresh          # reprovision this worktree's site
 pnpm run playground:server-development     # ephemeral, dev blueprint
 pnpm run playground:server-demo            # ephemeral, seeded demo store
+pnpm run playground:server-e2e             # ephemeral, e2e fixture — needs 'e2e' in modes + init --update
 pnpm run playground:setup                  # prerequisites only
 pnpm run screenshots                       # PR screenshot collage (needs @playwright/test)
 pnpm exec krokedil-playground compose      # write the generated blueprints for inspection
@@ -154,6 +157,8 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 | 8880 | returns-and-withdrawals |
 | 8890 | *(next plugin here)* |
 | 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
+
+8880 is also the tool's fallback when `basePort` is unset (returns-and-withdrawals claims it explicitly) — never rely on the fallback; the tool warns on every run until `basePort` is set.
 
 ## Tunnel domain registry
 
