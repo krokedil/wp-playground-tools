@@ -9,7 +9,10 @@ Onboarding a new plugin? Follow the step-by-step guide in [docs/onboarding.md](d
 ```sh
 pnpm add -D "@krokedil/wp-playground-tools@github:krokedil/wp-playground-tools#semver:^1"
 pnpm exec krokedil-playground init
+pnpm install
 ```
+
+> **Why the trailing `pnpm install`:** `pnpm add` resolves the `#semver:^1` range (installing the newest `v1.x.y` tag) but saves the dependency in `package.json` *without* the range — a bare git URL that would track the default branch. `init` corrects the saved spec back to `#semver:^1`; the `pnpm install` realigns the lockfile with it. Skipping it leaves a lockfile/manifest mismatch that fails `--frozen-lockfile` installs.
 
 `init` scaffolds everything a plugin needs and is idempotent:
 
