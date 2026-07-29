@@ -111,6 +111,7 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 |---|---|
 | 8880 | returns-and-withdrawals |
 | 8890 | *(next plugin here)* |
+| 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
 
 ## Logs / database
 
@@ -123,5 +124,16 @@ pnpm install
 pnpm test        # node:test — includes blueprint parity + golden tests
 pnpm run lint
 ```
+
+Dogfood against the committed `sandbox/` plugin — no consumer repo needed:
+
+```sh
+pnpm run sandbox:http    # ephemeral development server on :9881
+pnpm run sandbox:https   # + mkcert reverse proxy on https://localhost:10281
+pnpm run sandbox:ngrok   # + ngrok tunnel (public URL printed)
+pnpm run sandbox:start   # persistent worktree-isolated site on :9880
+```
+
+The sandbox's dashboard widget and `GET /wp-json/krokedil-sandbox/v1/ping` echo `home_url()`, `is_ssl()` and the forwarded headers, so each transport is verifiable at a glance. `.claude/launch.json` carries preview entries for the three server variants.
 
 Releases: bump `version`, update `CHANGELOG.md`, tag `vX.Y.Z`, push the tag. Consumers pick the release up via `pnpm update` (the `#semver:^1` range resolves against git tags). Smoke-test `@wp-playground/cli` pin bumps before tagging — a bad pin fans out to every plugin.

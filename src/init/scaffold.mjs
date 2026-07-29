@@ -92,6 +92,27 @@ function ensureLines(file, lines) {
  * @return {Promise<void>} Resolves when done.
  */
 export async function scaffold(root, args) {
+	// Dogfooding guard: init inside this package itself would inject a
+	// self-referential git dependency and rewrite this repo's package.json,
+	// .npmrc and .nvmrc. The committed sandbox/ plugin is the way to run the
+	// tool against this repo.
+	const ownPkgPath = path.join(root, 'package.json');
+	if (fs.existsSync(ownPkgPath)) {
+		let name = null;
+		try {
+			name = JSON.parse(fs.readFileSync(ownPkgPath, 'utf8')).name;
+		} catch {
+			// Unreadable/invalid package.json — not this package; proceed.
+		}
+		if (name === '@krokedil/wp-playground-tools') {
+			process.stderr.write(
+				'✖ init: refusing to scaffold @krokedil/wp-playground-tools itself — dogfood via the committed sandbox instead (pnpm run sandbox:http).\n'
+			);
+			process.exitCode = 1;
+			return;
+		}
+	}
+
 	const update = args.includes('--update');
 	const slug = inferSlug(root);
 

@@ -18,6 +18,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm run lint
+      - run: pnpm run format:check
+      - name: PHP lint (mu-plugins + sandbox)
+        run: |
+          for f in assets/mu-plugins/*.php sandbox/*.php; do
+            php -l "$f"
+          done
 
   # Parity insurance for every consumer: scaffold a fixture plugin with init,
   # boot an ephemeral development server, and assert WordPress answers.

@@ -319,7 +319,9 @@ export function ensurePrereqs(root, config, provisioning) {
 		}
 	}
 
-	if (!exists('node_modules')) {
+	// No package.json means no Node dependencies to install (the sandbox
+	// plugin, or a consumer with no JS tooling at all).
+	if (exists('package.json') && !exists('node_modules')) {
 		log('installing Node dependencies (pnpm install)…');
 		// Prefer --frozen-lockfile (reproducible, matches CI, never rewrites the
 		// lock). If the committed lockfile is stale or broken, fall back to a

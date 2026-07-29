@@ -21,6 +21,9 @@ importers:
       '@wordpress/eslint-plugin':
         specifier: ^25.0.0
         version: 25.7.0(@babel/core@7.29.7)(@types/react@18.3.31)(@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@9.39.5)(typescript@6.0.3))(eslint@9.39.5)(typescript@6.0.3))(@typescript-eslint/parser@8.65.0(eslint@9.39.5)(typescript@6.0.3))(eslint@9.39.5)(prettier@3.9.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@6.0.3)
+      '@wordpress/prettier-config':
+        specifier: ^4.0.0
+        version: 4.51.0(prettier@3.9.6)
       eslint:
         specifier: ^9.39.4
         version: 9.39.5

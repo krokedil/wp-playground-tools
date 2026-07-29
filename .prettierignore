@@ -1,0 +1,4 @@
+# Mirror eslint.config.mjs ignores: templates are copied verbatim into
+# consumer repos — no formatting churn on shipped files.
+src/init/templates/
+assets/
