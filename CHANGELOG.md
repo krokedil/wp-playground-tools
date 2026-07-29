@@ -22,6 +22,18 @@
   public. `--tunnel` on a warm persistent site provisioned before the guard
   existed now refuses to launch and asks for one `--fresh` run rather than
   publishing an ungated site.
+- Development mode gained a guest toggle for logged-out testing:
+  `?krokedil-guest=1` on any local URL (or **Browse as guest** in the admin bar)
+  logs out and sets a 12-hour cookie that stands both the dev auto-login and
+  Playground's own auto-login down; `?krokedil-guest=0` restores them. Logging
+  out was not enough on its own — WordPress renders front-end login links as
+  plain `wp-login.php?redirect_to=…` GETs, which the auto-login below treats as
+  "log me in", so a click on a comment form or the Meta widget silently ended
+  the test and redirected into wp-admin. The toggle is per browser (a second
+  profile stays admin), ignored for non-local requests (over a tunnel the
+  tunnel guard owns login behavior), and clears the WooCommerce cart along with
+  the session. No customer account is seeded: this covers logged-out testing,
+  not logged-in-customer testing.
 - Development mode now stages a `playground-dev-login.php` mu-plugin that
   auto-submits any plain GET of wp-login.php as `admin`. The Playground CLI's
   own auto-login is single-shot per client — a curl health check or tool probe

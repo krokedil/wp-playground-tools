@@ -38,6 +38,8 @@ On a fresh clone/worktree that one command installs composer + Node deps (pnpm o
 
 Admin credentials are the Playground CLI defaults, `admin` / `password`. In development mode you rarely type them: a staged mu-plugin auto-submits the wp-login form as `admin` (including after `--fresh` wipes sessions), while guest storefront browsing and logging in as another user keep working. Auto-login only answers local requests — browsing via a `--tunnel` URL shows the normal login form, and there the default password is refused in favour of a [per-run tunnel password](#tunnel-logins-need-the-run-password), so the public URL never hands out admin sessions. See [docs/reference.md](docs/reference.md#defaults-and-development-mode-extras).
 
+**Testing as a logged-out visitor** (development mode): add `?krokedil-guest=1` to any local URL, or click **Browse as guest** in the admin bar. That logs you out and keeps you out for 12 hours — necessary because WordPress renders front-end login links as plain `wp-login.php?redirect_to=…` GETs, which auto-login treats as "log me in", so one click on a comment form or the Meta widget would otherwise end the test and drop you in wp-admin. `?krokedil-guest=0` restores normal auto-login. It applies to the browser that asked (a second profile stays admin), and entering it clears the cart along with the session — what you want before a guest checkout run.
+
 ## Commands
 
 ```
