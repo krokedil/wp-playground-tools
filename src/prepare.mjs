@@ -245,22 +245,55 @@ export function ensureNodeForProvisioning(root) {
 }
 
 /**
+ * Directory holding this worktree's persistent site.
+ *
+ * @param {string} root Plugin root the CLI is launched from.
+ * @return {string} Absolute path (may not exist yet).
+ */
+function siteDir(root) {
+	return path.join(
+		os.homedir(),
+		'.wordpress-playground',
+		'sites',
+		computeSiteHash(process.env.PWD || root)
+	);
+}
+
+/**
  * Whether this worktree's persistent site is provisioned.
  *
  * @param {string} root Plugin root the CLI is launched from.
  * @return {boolean} True when the site's SQLite database exists.
  */
 export function isProvisioned(root) {
-	const db = path.join(
-		os.homedir(),
-		'.wordpress-playground',
-		'sites',
-		computeSiteHash(process.env.PWD || root),
-		'wp-content',
-		'database',
-		'.ht.sqlite'
-	);
+	const db = path.join(siteDir(root), 'wp-content', 'database', '.ht.sqlite');
 	return fs.existsSync(db);
+}
+
+/**
+ * Whether a staged mu-plugin is linked into the persistent site.
+ *
+ * The symlinks live in the site directory and are created by the blueprint's
+ * link step — so a mu-plugin added to this package after a site was
+ * provisioned is missing until the next --fresh, even though staging copies it
+ * on every launch. Callers that depend on a mu-plugin being active (the tunnel
+ * guard) use this to fail closed instead of silently running without it.
+ *
+ * @param {string} root Plugin root the CLI is launched from.
+ * @param {string} name mu-plugin basename.
+ * @return {boolean} True when the link exists.
+ */
+export function isMuPluginLinked(root, name) {
+	// lstatSync, not existsSync: the symlink targets a path inside the WASM
+	// filesystem, which never resolves on the host.
+	try {
+		fs.lstatSync(
+			path.join(siteDir(root), 'wp-content', 'mu-plugins', name)
+		);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**

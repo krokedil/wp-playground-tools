@@ -28,9 +28,9 @@ const MODE_DEFAULTS = {
 };
 
 /**
- * The staged mu-plugin basenames for a mode: the proxy-url helper always, the
- * auto-login helper and declarative seeder for development, plus the plugin's
- * own files.
+ * The staged mu-plugin basenames for a mode: the proxy-url and tunnel-guard
+ * helpers always, the auto-login helper and declarative seeder for
+ * development, plus the plugin's own files.
  *
  * @param {Object} config Normalized plugin config.
  * @param {string} mode   Blueprint mode.
@@ -44,6 +44,16 @@ function muPluginFiles(config, mode) {
 				ASSETS_DIR,
 				'mu-plugins',
 				'playground-proxy-url.php'
+			),
+		},
+		{
+			// Every mode, not just tunnelled runs: --tunnel is a per-run flag,
+			// and the guard is inert until a tunnel writes its password file.
+			name: 'playground-tunnel-guard.php',
+			source: path.join(
+				ASSETS_DIR,
+				'mu-plugins',
+				'playground-tunnel-guard.php'
 			),
 		},
 	];
