@@ -58,6 +58,8 @@ pnpm run playground:start
 
 (npm plugins: `npm install && npm run playground:start`, and forward any extra flags after a `--` separator — `npm run playground:start -- --fresh`.) That installs composer + Node deps, builds assets (when configured), composes the blueprint, provisions a persistent site, and boots it. Log in with `admin` / `password`. The site is isolated per checkout (keyed by `sha256(cwd)`), so worktrees don't share state; warm boots preserve data and `--fresh` reprovisions. Logs and the SQLite database live under `~/.wordpress-playground/sites/<hash>/wp-content/` — see [README](../README.md#logs--database).
 
+Don't be alarmed by order notes saying `Email "…" failed to send: Could not instantiate mail function.` — Playground can't send mail at all. Attempted emails (with full content) are captured by the pre-activated wp-mail-logging plugin under **Tools → Email Log**; see the [README caveat](../README.md#-emails-never-send--read-them-in-tools--email-log).
+
 ## 5. Optional pieces
 
 - **Seed data** — development mode seeds a generic SE WooCommerce fixture (products, tax, coupons, shipping, order templates). To seed plugin-specific data, point `seedData` at a JSON file in your repo; the shape is documented in [reference.md](reference.md#seed-data-json).
