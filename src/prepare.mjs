@@ -302,6 +302,53 @@ function pm(root, manager, argv, what) {
 }
 
 /**
+ * Print a heads-up when composer has no GitHub token, before the install.
+ *
+ * Without a token composer cannot download private krokedil/* dists and
+ * prints "Failed to download … Could not authenticate against github.com /
+ * Now trying to download from source" per package. The git-clone fallback
+ * works, but the warnings read as failures to someone onboarding — so when
+ * no token is configured anywhere composer looks (COMPOSER_AUTH, the
+ * plugin's auth.json/composer.json, the global auth.json), say up front
+ * that they're expected and how to silence them.
+ *
+ * @param {string} root Plugin root.
+ */
+function warnIfComposerLacksGithubToken(root) {
+	// COMPOSER_AUTH counts only when it actually carries a github.com token —
+	// it may hold auth for other hosts only (then the warnings still appear).
+	try {
+		if (
+			JSON.parse(process.env.COMPOSER_AUTH ?? '')?.['github-oauth']?.[
+				'github.com'
+			]
+		) {
+			return;
+		}
+	} catch {
+		// Unset or invalid JSON — fall through to the config probes.
+	}
+	const probe = (args) =>
+		spawnSync('composer', ['config', ...args, 'github-oauth.github.com'], {
+			cwd: root,
+			stdio: 'ignore',
+		});
+	const local = probe([]);
+	if (local.error) {
+		return; // No composer binary — the install below fails with its own message.
+	}
+	if (local.status === 0 || probe(['-g']).status === 0) {
+		return;
+	}
+	log(
+		'no GitHub token configured for composer — private packages will warn ' +
+			'"Could not authenticate against github.com" and fall back to git ' +
+			'clone. That works; to silence the warnings (and download faster), ' +
+			'run: composer config -g github-oauth.github.com <token>'
+	);
+}
+
+/**
  * Install whatever a fresh worktree is missing. Idempotent: each step is
  * skipped when its marker already exists.
  *
@@ -317,6 +364,7 @@ export function ensurePrereqs(root, config, provisioning) {
 		config.composer &&
 		config.composer.markers.some((marker) => !exists(marker))
 	) {
+		warnIfComposerLacksGithubToken(root);
 		log('installing PHP dependencies (composer install)…');
 		const res = spawnSync(
 			'composer',

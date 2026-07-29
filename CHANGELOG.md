@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The bootstrap now prints a one-line heads-up before `composer install`
+  when no GitHub token is configured: the per-package "Could not
+  authenticate against github.com" warnings for private packages are
+  composer's expected git-clone fallback, not failures, and
+  `composer config -g github-oauth.github.com <token>` silences them.
+  (Observed onboarding klarna-payments-for-woocommerce.)
+
 - Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
   crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),
   shipped in 3.1.36), so the Node `<21` ceiling is gone.
