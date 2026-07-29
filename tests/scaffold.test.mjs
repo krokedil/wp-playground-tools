@@ -149,6 +149,42 @@ test('scaffold is idempotent and never overwrites the config', async (t) => {
 	);
 });
 
+test('scaffold --update derives scripts and launch entries from config.modes', async (t) => {
+	const root = makePluginRoot(t);
+	await scaffold(root, []);
+
+	const pkgPath = path.join(root, 'package.json');
+	assert.equal(
+		JSON.parse(fs.readFileSync(pkgPath, 'utf8')).scripts[
+			'playground:server-e2e'
+		],
+		undefined
+	);
+
+	fs.writeFileSync(
+		path.join(root, 'playground.config.mjs'),
+		"export default { slug: 'my-payment-gateway', basePort: 8890, modes: ['start', 'development', 'demo', 'e2e'] };\n"
+	);
+	await scaffold(root, ['--update']);
+
+	const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+	assert.equal(
+		pkg.scripts['playground:server-e2e'],
+		'node tools/playground.mjs server e2e'
+	);
+
+	const launch = JSON.parse(
+		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
+	);
+	const entries = launch.configurations.filter((c) =>
+		/^playground-/.test(c.name)
+	);
+	assert.equal(entries.length, 4);
+	const e2e = entries.find((c) => /-e2e$/.test(c.name));
+	assert.equal(e2e.port, 8893);
+	assert.deepEqual(e2e.runtimeArgs, ['run', 'playground:server-e2e']);
+});
+
 test('scaffold --update respects a custom basePort from the config', async (t) => {
 	const root = makePluginRoot(t);
 	await scaffold(root, []);

@@ -21,6 +21,7 @@ export default {
 	slug: 'returns-and-withdrawals',
 	siteName: 'Returns and Withdrawals',
 	landingPage: '/returns/',
+	basePort: 8880,
 	composer: {
 		markers: ['vendor/autoload.php', 'dependencies/autoload.php'],
 	},
