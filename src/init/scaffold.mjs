@@ -214,6 +214,16 @@ export async function scaffold(root, args) {
 			scriptsChanged = true;
 		}
 	}
+	// --update also prunes generated scripts for modes dropped from the
+	// config — but only untouched ones, so customized scripts survive.
+	if (update) {
+		for (const [mode, [name, cmd]] of Object.entries(MODE_SCRIPTS)) {
+			if (!modes.includes(mode) && pkg.scripts[name] === cmd) {
+				delete pkg.scripts[name];
+				scriptsChanged = true;
+			}
+		}
+	}
 	pkg.devDependencies = pkg.devDependencies ?? {};
 	if (!pkg.devDependencies['@krokedil/wp-playground-tools']) {
 		pkg.devDependencies['@krokedil/wp-playground-tools'] = PACKAGE_SPEC;
