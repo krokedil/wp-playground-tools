@@ -35,15 +35,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Whether the request was addressed to the machine itself.
  *
- * Checks hostnames, not peer addresses: a tunnel agent connects from
- * loopback, so REMOTE_ADDR can't tell tunnel traffic apart — but ngrok
- * delivers requests with the tunnel domain as Host (its edge routes by
- * Host, so a spoofed localhost Host never reaches the tunnel), while the
- * local https proxy forwards with Host/X-Forwarded-Host: localhost:<port>.
+ * Hostnames are the primary signal: a tunnel agent connects from loopback,
+ * so REMOTE_ADDR alone can't tell tunnel traffic apart — but ngrok delivers
+ * requests with the tunnel domain as Host (its edge routes by Host, so a
+ * spoofed localhost Host never reaches the tunnel), while the local https
+ * proxy forwards with Host/X-Forwarded-Host: localhost:<port>. A loopback
+ * REMOTE_ADDR is additionally required (when the SAPI provides one) so a
+ * LAN/bridge client that spoofs a localhost Host still gets the form —
+ * same trust rule as krokedil_pg_proxy_is_https_request().
  *
- * @return bool True when Host (and X-Forwarded-Host, if any) is loopback.
+ * @return bool True when the peer (if known) and every host name are loopback.
  */
 function krokedil_pg_dev_login_is_local() {
+	if (
+		isset( $_SERVER['REMOTE_ADDR'] )
+		&& ! in_array( $_SERVER['REMOTE_ADDR'], array( '127.0.0.1', '::1' ), true ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+	) {
+		return false;
+	}
 	foreach ( array( 'HTTP_HOST', 'HTTP_X_FORWARDED_HOST' ) as $key ) {
 		if ( ! isset( $_SERVER[ $key ] ) ) {
 			continue;
