@@ -393,9 +393,10 @@ export async function launch(root, config, modeName, userArgs) {
 		return null;
 	}
 
-	// (Re)generate the blueprint and stage runtime PHP assets. Cheap, and warm
-	// boots need the staged mu-plugins to exist inside the mount too.
-	composeAndStage(root, config, mode.blueprintMode);
+	// (Re)generate the blueprint and stage runtime assets (mu-plugins, seed
+	// data, pre-downloaded plugin zips). Warm boots need the staged mu-plugins
+	// to exist inside the mount too.
+	await composeAndStage(root, config, mode.blueprintMode);
 
 	// --fresh is ours, not the CLI's; strip it before forwarding.
 	const forwarded = userArgs.filter((a) => a !== '--fresh');

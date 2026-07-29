@@ -198,21 +198,32 @@ export function wooCommercePages() {
 }
 
 /**
- * The development-mode debug plugin bundle.
+ * The development-mode debug plugin bundle. Installed WITHOUT the CLI's
+ * activate option and activated via wp-cli instead: the CLI's activatePlugin
+ * chokes on plugins that emit output/redirect during activation (seen with
+ * wp-mail-logging on a WooCommerce site — "Could not unlink
+ * /tmp/playground-activate-plugin.log"), while wp-cli tolerates it.
  *
- * @return {Object[]} installPlugin steps.
+ * @return {Object[]} installPlugin steps + one wp-cli activation.
  */
 export function debugPlugins() {
-	return [
+	const slugs = [
 		'query-monitor',
 		'show-hidden-post-meta',
 		'transients-manager',
 		'wp-mail-logging',
-	].map((slug) => ({
-		step: 'installPlugin',
-		pluginData: { resource: 'wordpress.org/plugins', slug },
-		options: { activate: true },
-	}));
+	];
+	return [
+		...slugs.map((slug) => ({
+			step: 'installPlugin',
+			pluginData: { resource: 'wordpress.org/plugins', slug },
+			options: { activate: false },
+		})),
+		{
+			step: 'wp-cli',
+			command: `wp plugin activate ${slugs.join(' ')}`,
+		},
+	];
 }
 
 /**

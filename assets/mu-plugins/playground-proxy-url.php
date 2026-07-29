@@ -52,6 +52,12 @@ function krokedil_pg_proxy_is_https_request() {
 }
 
 if ( '' !== krokedil_pg_proxy_url() ) {
+	// The internal origin, read BEFORE our option filters attach. Constants
+	// like WP_CONTENT_URL are derived from it earlier in bootstrap than
+	// mu-plugins load, so URL-generating filters below must rewrite it too
+	// (in both schemes — is_ssl() flips http:// to https:// via set_url_scheme).
+	$krokedil_pg_internal = untrailingslashit( (string) get_option( 'siteurl' ) );
+
 	foreach ( array( 'option_home', 'option_siteurl' ) as $filter ) {
 		add_filter(
 			$filter,
@@ -61,6 +67,33 @@ if ( '' !== krokedil_pg_proxy_url() ) {
 			1000
 		);
 	}
+
+	$krokedil_pg_rewrite = function ( $url ) use ( $krokedil_pg_internal ) {
+		if ( ! is_string( $url ) || '' === $krokedil_pg_internal ) {
+			return $url;
+		}
+		$bare = preg_replace( '#^https?:#', '', $krokedil_pg_internal );
+		return preg_replace(
+			'#^https?:' . preg_quote( $bare, '#' ) . '#',
+			krokedil_pg_proxy_url(),
+			$url
+		);
+	};
+	foreach ( array( 'content_url', 'plugins_url', 'site_url', 'home_url', 'includes_url', 'rest_url', 'script_loader_src', 'style_loader_src', 'wp_get_attachment_url' ) as $filter ) {
+		add_filter( $filter, $krokedil_pg_rewrite, 1000 );
+	}
+	add_filter(
+		'upload_dir',
+		function ( $dirs ) use ( $krokedil_pg_rewrite ) {
+			foreach ( array( 'url', 'baseurl' ) as $key ) {
+				if ( isset( $dirs[ $key ] ) ) {
+					$dirs[ $key ] = $krokedil_pg_rewrite( $dirs[ $key ] );
+				}
+			}
+			return $dirs;
+		},
+		1000
+	);
 
 	if ( krokedil_pg_proxy_is_https_request() ) {
 		$_SERVER['HTTPS'] = 'on';

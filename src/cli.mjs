@@ -52,7 +52,11 @@ export async function main(argv = process.argv.slice(2)) {
 				? rest
 				: config.modes.filter((m) => m !== 'start');
 			for (const mode of modes) {
-				const { blueprintPath } = composeAndStage(root, config, mode);
+				const { blueprintPath } = await composeAndStage(
+					root,
+					config,
+					mode
+				);
 				log(`composed ${blueprintPath}`);
 			}
 			return;

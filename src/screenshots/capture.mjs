@@ -44,17 +44,33 @@ import {
 	stat,
 	writeFile,
 } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 /**
- * Load Playwright's chromium, failing with an actionable message when the
- * optional peer dependency isn't installed.
+ * Load Playwright's chromium — preferring the PLUGIN's @playwright/test (its
+ * devDependency, whose browsers the developer installed) over any copy in
+ * this package's own tree, so versions and browser revisions always match.
+ * Fails with an actionable message when neither resolves.
  *
+ * @param {string} root Plugin root to resolve from.
  * @return {Promise<Object>} The chromium browser type.
  */
-async function loadChromium() {
+async function loadChromium(root) {
+	try {
+		const require = createRequire(path.join(root, 'package.json'));
+		const resolved = require.resolve('@playwright/test');
+		// CJS entry: named-export interop isn't guaranteed, so check default too.
+		const mod = await import(pathToFileURL(resolved).href);
+		const chromium = mod.chromium ?? mod.default?.chromium;
+		if (chromium) {
+			return chromium;
+		}
+	} catch {
+		// Fall through to our own resolution.
+	}
 	try {
 		const { chromium } = await import('@playwright/test');
 		return chromium;
@@ -274,7 +290,7 @@ export async function capture(root, pluginConfig, argv) {
 			cols,
 			rows
 		);
-		const chromium = await loadChromium();
+		const chromium = await loadChromium(root);
 		const b = await chromium.launch({ headless: true });
 		const pg = await b.newPage({
 			viewport: { width: 2400, height: 1400 },
@@ -495,7 +511,7 @@ export async function capture(root, pluginConfig, argv) {
 		throw new Error(`unknown shot type: ${shot.type}`);
 	};
 
-	const chromium = await loadChromium();
+	const chromium = await loadChromium(root);
 	const browser = await chromium.launch({ headless: true });
 	const context = await browser.newContext({
 		viewport: VIEWPORT,

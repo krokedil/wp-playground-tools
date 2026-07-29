@@ -8,10 +8,13 @@
  * site's mu-plugin symlinks point into the mount at .playground/mu-plugins/.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { wpVersionFor } from '../config.mjs';
+import { pluginContainerPath } from './steps.mjs';
 import * as steps from './steps.mjs';
 
 /** Package-root assets directory (mu-plugins, default seed data). */
@@ -148,6 +151,108 @@ export function composeBlueprint(config, mode) {
 	};
 }
 
+/** How long a cached wordpress.org plugin zip stays fresh. */
+const ZIP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Host-side download cache for wordpress.org zips (overridable for tests).
+ *
+ * @return {string} Absolute cache directory.
+ */
+function zipCacheDir() {
+	return (
+		process.env.KROKEDIL_PG_CACHE_DIR ||
+		path.join(os.homedir(), '.config', 'krokedil-playground', 'cache')
+	);
+}
+
+/**
+ * Download a URL to a file with retries (Playground's in-WASM fetch is flaky;
+ * the host's fetch is not).
+ *
+ * @param {string} url      Source URL.
+ * @param {string} dest     Destination file path.
+ * @param {number} attempts Total attempts.
+ */
+async function fetchToFile(url, dest, attempts = 3) {
+	let lastError;
+	for (let i = 0; i < attempts; i++) {
+		try {
+			const res = await fetch(url, {
+				signal: AbortSignal.timeout(30000),
+				redirect: 'follow',
+			});
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}`);
+			}
+			const buffer = Buffer.from(await res.arrayBuffer());
+			if (buffer.length < 1000) {
+				throw new Error(
+					`suspiciously small download (${buffer.length} bytes)`
+				);
+			}
+			fs.writeFileSync(dest, buffer);
+			return;
+		} catch (err) {
+			lastError = err;
+		}
+	}
+	throw lastError;
+}
+
+/**
+ * Pre-download wordpress.org plugin zips on the host and rewrite the
+ * blueprint's installPlugin steps to install from the mounted copy, so the
+ * Playground CLI never fetches plugins through its flaky in-WASM network
+ * stack. Zips are cached (7-day TTL) and staged into .playground/plugins/.
+ * A failed download leaves that step on wordpress.org as before (warned).
+ *
+ * @param {string} root      Plugin root.
+ * @param {Object} config    Normalized plugin config.
+ * @param {Object} blueprint Composed blueprint (mutated in place).
+ */
+async function stagePluginZips(root, config, blueprint) {
+	const installSteps = blueprint.steps.filter(
+		(s) =>
+			s.step === 'installPlugin' &&
+			s.pluginData?.resource === 'wordpress.org/plugins'
+	);
+	if (!installSteps.length) {
+		return;
+	}
+
+	const cacheDir = zipCacheDir();
+	const stagedDir = path.join(root, '.playground', 'plugins');
+	fs.mkdirSync(cacheDir, { recursive: true });
+	fs.mkdirSync(stagedDir, { recursive: true });
+
+	for (const step of installSteps) {
+		const slug = step.pluginData.slug;
+		const cached = path.join(cacheDir, `${slug}.zip`);
+		const fresh =
+			fs.existsSync(cached) &&
+			Date.now() - fs.statSync(cached).mtimeMs < ZIP_TTL_MS;
+		if (!fresh) {
+			try {
+				await fetchToFile(
+					`https://downloads.wordpress.org/plugin/${slug}.latest-stable.zip`,
+					cached
+				);
+			} catch (err) {
+				process.stderr.write(
+					`▶ playground: could not pre-download ${slug} (${err.message}) — the CLI will fetch it itself.\n`
+				);
+				continue;
+			}
+		}
+		fs.copyFileSync(cached, path.join(stagedDir, `${slug}.zip`));
+		step.pluginData = {
+			resource: 'vfs',
+			path: `${pluginContainerPath(config.slug)}/.playground/plugins/${slug}.zip`,
+		};
+	}
+}
+
 /**
  * Compose a mode's blueprint and stage its runtime assets under
  * <root>/.playground/. Idempotent; overwrites previous output.
@@ -155,9 +260,9 @@ export function composeBlueprint(config, mode) {
  * @param {string} root   Plugin root (absolute).
  * @param {Object} config Normalized plugin config.
  * @param {string} mode   Blueprint mode.
- * @return {{ blueprintPath: string }} Path of the written blueprint file.
+ * @return {Promise<{ blueprintPath: string }>} Path of the written blueprint file.
  */
-export function composeAndStage(root, config, mode) {
+export async function composeAndStage(root, config, mode) {
 	const stagingDir = path.join(root, '.playground');
 	const muDir = path.join(stagingDir, 'mu-plugins');
 	fs.mkdirSync(muDir, { recursive: true });
@@ -190,6 +295,8 @@ export function composeAndStage(root, config, mode) {
 	}
 
 	const blueprint = composeBlueprint(config, mode);
+	await stagePluginZips(root, config, blueprint);
+
 	const blueprintPath = path.join(stagingDir, `blueprint.${mode}.json`);
 	fs.writeFileSync(blueprintPath, JSON.stringify(blueprint, null, 2) + '\n');
 

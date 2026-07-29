@@ -207,9 +207,26 @@ test('a woocommerce:false plugin gets no WC steps', () => {
 	assert.ok(!code.includes('playground_seed_products'));
 });
 
-test('composeAndStage writes the blueprint and stages assets', (t) => {
+test('composeAndStage writes the blueprint and stages assets', async (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-compose-'));
-	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	// Pre-seed the zip cache so staging never touches the network: fake zips
+	// (>1000 bytes so the size sanity check would pass had they been fetched).
+	const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-cache-'));
+	process.env.KROKEDIL_PG_CACHE_DIR = cache;
+	t.after(() => {
+		delete process.env.KROKEDIL_PG_CACHE_DIR;
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(cache, { recursive: true, force: true });
+	});
+	for (const slug of [
+		'woocommerce',
+		'query-monitor',
+		'show-hidden-post-meta',
+		'transients-manager',
+		'wp-mail-logging',
+	]) {
+		fs.writeFileSync(path.join(cache, `${slug}.zip`), 'x'.repeat(2000));
+	}
 
 	// A plugin-local mu-plugin + seed data to stage.
 	fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
@@ -227,7 +244,11 @@ test('composeAndStage writes the blueprint and stages assets', (t) => {
 		muPlugins: { development: ['tools/my-helper.php'] },
 		seedData: 'tools/seed.json',
 	});
-	const { blueprintPath } = composeAndStage(root, config, 'development');
+	const { blueprintPath } = await composeAndStage(
+		root,
+		config,
+		'development'
+	);
 
 	assert.equal(
 		blueprintPath,
@@ -239,25 +260,35 @@ test('composeAndStage writes the blueprint and stages assets', (t) => {
 		'mu-plugins/playground-seeder.php',
 		'mu-plugins/my-helper.php',
 		'seed-data.json',
+		'plugins/woocommerce.zip',
+		'plugins/wp-mail-logging.zip',
 	]) {
 		assert.ok(
 			fs.existsSync(path.join(root, '.playground', staged)),
 			`not staged: ${staged}`
 		);
 	}
-	// The written blueprint parses back to the composed object.
+	// Every wordpress.org installPlugin step was rewritten to the staged zip.
 	const parsed = JSON.parse(fs.readFileSync(blueprintPath, 'utf8'));
-	assert.deepEqual(parsed, composeBlueprint(config, 'development'));
+	const installs = parsed.steps.filter((s) => s.step === 'installPlugin');
+	assert.ok(installs.length >= 5);
+	for (const step of installs) {
+		assert.equal(step.pluginData.resource, 'vfs');
+		assert.match(
+			step.pluginData.path,
+			/^\/wordpress\/wp-content\/plugins\/a-plugin\/\.playground\/plugins\/[a-z-]+\.zip$/
+		);
+	}
 });
 
-test('composeAndStage fails actionably on a missing mu-plugin', (t) => {
+test('composeAndStage fails actionably on a missing mu-plugin', async (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-compose-'));
 	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 	const config = normalizeConfig({
 		slug: 'a-plugin',
 		muPlugins: { development: ['tools/nope.php'] },
 	});
-	assert.throws(
+	await assert.rejects(
 		() => composeAndStage(root, config, 'development'),
 		/mu-plugin not found.*config\.muPlugins/s
 	);
