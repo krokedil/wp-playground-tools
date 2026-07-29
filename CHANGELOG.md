@@ -7,6 +7,10 @@
   the spec on save — all versions, 9 through 11). Deliberate `#committish`
   pins are left untouched. Install docs now end with a `pnpm install` to
   realign the lockfile. (Found onboarding klarna-payments-for-woocommerce.)
+- Fix: `init` rewrote the consumer's whole `package.json` (and a pre-existing
+  `.claude/launch.json`) with tab indentation; the existing indentation is now
+  detected and preserved (tabs remain the default for new files). (Observed
+  onboarding klarna-payments-for-woocommerce.)
 
 ## 1.1.1 — 2026-07-29
 

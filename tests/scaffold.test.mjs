@@ -227,6 +227,52 @@ test('scaffold --update prunes dropped-mode scripts but keeps customized ones', 
 	);
 });
 
+test('scaffold preserves existing JSON indentation, defaults to tabs', async (t) => {
+	const root = makePluginRoot(t);
+	fs.writeFileSync(
+		path.join(root, 'package.json'),
+		JSON.stringify({ name: 'my-payment-gateway', private: true }, null, 2) +
+			'\n'
+	);
+	fs.mkdirSync(path.join(root, '.claude'));
+	fs.writeFileSync(
+		path.join(root, '.claude', 'launch.json'),
+		JSON.stringify(
+			{
+				version: '0.0.1',
+				configurations: [{ name: 'storybook', port: 6006 }],
+			},
+			null,
+			2
+		) + '\n'
+	);
+
+	await scaffold(root, []);
+
+	const pkgBody = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
+	assert.match(pkgBody, /^ {2}"name"/m);
+	assert.ok(!pkgBody.includes('\t'));
+	assert.equal(
+		JSON.parse(pkgBody).scripts['playground:start'],
+		'node tools/playground.mjs start'
+	);
+
+	const launchBody = fs.readFileSync(
+		path.join(root, '.claude', 'launch.json'),
+		'utf8'
+	);
+	assert.match(launchBody, /^ {2}"version"/m);
+	assert.ok(!launchBody.includes('\t'));
+
+	// Without a pre-existing package.json the tab default applies.
+	const bare = makePluginRoot(t);
+	await scaffold(bare, []);
+	assert.match(
+		fs.readFileSync(path.join(bare, 'package.json'), 'utf8'),
+		/^\t"name"/m
+	);
+});
+
 test('scaffold restores the #semver range pnpm add drops, keeps deliberate pins', async (t) => {
 	// `pnpm add …#semver:^1` resolves the range but saves the normalized
 	// branch-tracking spec — init must correct it back to PACKAGE_SPEC.
