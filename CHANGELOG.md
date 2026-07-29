@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Development mode now stages a `playground-dev-login.php` mu-plugin that
+  auto-submits any plain GET of wp-login.php as `admin`. The Playground CLI's
+  own auto-login is single-shot per client — a curl health check or tool probe
+  consumes it, leaving the developer's first real visit on the login form, and
+  `--fresh` wiped sessions entirely (observed onboarding
+  klarna-payments-for-woocommerce). Guest browsing, credential POSTs, logouts
+  and `wp-login.php?action=login` are untouched; demo/e2e modes keep the
+  upstream behavior. Auto-login is local-only (loopback Host and REMOTE_ADDR
+  required), so a `--tunnel` URL always shows the normal login form instead
+  of handing admin sessions to anyone holding it. Docs now also state the
+  `admin` / `password` defaults.
 - The bootstrap now prints a one-line heads-up before `composer install`
   when no GitHub token is configured: the per-package "Could not
   authenticate against github.com" warnings for private packages are

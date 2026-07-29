@@ -29,7 +29,8 @@ const MODE_DEFAULTS = {
 
 /**
  * The staged mu-plugin basenames for a mode: the proxy-url helper always, the
- * declarative seeder for development, plus the plugin's own files.
+ * auto-login helper and declarative seeder for development, plus the plugin's
+ * own files.
  *
  * @param {Object} config Normalized plugin config.
  * @param {string} mode   Blueprint mode.
@@ -46,6 +47,18 @@ function muPluginFiles(config, mode) {
 			),
 		},
 	];
+	if (mode === 'development') {
+		// wp-login.php auto-submits as admin: the CLI's own `login: true` is
+		// single-shot and any health-check request consumes it.
+		files.push({
+			name: 'playground-dev-login.php',
+			source: path.join(
+				ASSETS_DIR,
+				'mu-plugins',
+				'playground-dev-login.php'
+			),
+		});
+	}
 	if (mode === 'development' && config.woocommerce) {
 		files.push({
 			name: 'playground-seeder.php',
