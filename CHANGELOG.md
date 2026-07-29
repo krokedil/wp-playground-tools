@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1 — 2026-07-29
 
 - Fix: `pnpm exec krokedil-playground …` was a silent no-op under pnpm — the
   bin stub passes a node_modules symlink as argv[1], so the direct-execution
