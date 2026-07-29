@@ -88,9 +88,11 @@ Two flags, one mechanism: the tool writes the public URL to `.playground/proxy-u
 pnpm run playground:start --tunnel
 ```
 
-Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` env or `ngrok config add-authtoken`; the tool never stores it). Webhook URLs built from `home_url()` automatically use the tunnel URL.
+Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` env or `ngrok config add-authtoken`; the tool never stores it — ngrok holds it). **Use your personal authtoken under the Krokedil pay-as-you-go account** (dashboard.ngrok.com → Your Authtoken), not a free personal account: free accounts allow only 1 simultaneous agent session, which breaks running several tunnels at once, and can't serve reserved domains. Webhook URLs built from `home_url()` automatically use the tunnel URL.
 
-**Reserve a domain for webhook work** (`tunnel.domain`): a free-tier URL changes on every run, so callback registrations at the provider go stale. The tool warns loudly when tunneling without one.
+**Reserve a domain for webhook work** (`tunnel.domain`): an ephemeral URL changes on every run, so callback registrations at the provider go stale. The tool warns loudly when tunneling without one. Reserve the domain at dashboard.ngrok.com/domains under the company account and claim it in the [tunnel domain registry](#tunnel-domain-registry).
+
+**Parallel worktrees**: sites, ports and tunnels are per-worktree automatically (each worktree gets its own persistent site and auto-shifts to a free port). The one shared thing is the committed `tunnel.domain` — a second simultaneous tunnel on the same plugin needs `--tunnel-domain=<second-reserved-domain>` (stable webhooks; claim it in the registry) or `--tunnel-domain=none` (quick ephemeral URL). The flag implies `--tunnel`.
 
 ### `--https` (local only — secure-context features, no tunnel account)
 
@@ -113,6 +115,14 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 | 8880 | returns-and-withdrawals |
 | 8890 | *(next plugin here)* |
 | 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
+
+## Tunnel domain registry
+
+Reserve tunnel domains under the company ngrok pay-as-you-go account (dashboard.ngrok.com/domains) and claim a row per domain. Plugins under active parallel development may claim more than one (the extra ones are used via `--tunnel-domain=`):
+
+| tunnel.domain | Plugin |
+|---|---|
+| *(first domain here)* | |
 
 ## Logs / database
 

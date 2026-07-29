@@ -33,6 +33,10 @@ export default {
 	// PR screenshot manifest (omit to disable `screenshots`).
 	// screenshots: './tools/shots.config.mjs',
 
-	// For --tunnel: reserve an ngrok domain for stable webhook callbacks.
+	// For --tunnel: reserve a stable domain per plugin under the company ngrok
+	// pay-as-you-go account (dashboard.ngrok.com/domains) and claim it in the
+	// tunnel domain registry table (shared README) — stable webhook callbacks
+	// depend on it. Parallel worktrees: override per run with
+	// --tunnel-domain=<second-reserved-domain|none>.
 	// tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' },
 };

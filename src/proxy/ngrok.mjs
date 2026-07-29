@@ -58,6 +58,88 @@ export function parseTunnelsApi(payload) {
 }
 
 /**
+ * Actionable hints for the ngrok error codes devs actually hit, keyed by code.
+ *
+ * The multi-instance failure modes (108, 334) matter most: parallel worktrees
+ * on one plugin hit them first. Codes verified against ngrok.com/docs/errors.
+ */
+const NGROK_ERROR_HINTS = {
+	ERR_NGROK_4018:
+		'No ngrok authtoken configured. Get your personal token under the Krokedil ' +
+		'pay-as-you-go account (dashboard.ngrok.com) and run `ngrok config add-authtoken <token>` ' +
+		'or set NGROK_AUTHTOKEN.',
+	ERR_NGROK_105:
+		'The configured ngrok authtoken is malformed. Re-copy it from the Krokedil ' +
+		'account dashboard and run `ngrok config add-authtoken <token>`.',
+	ERR_NGROK_107:
+		'The configured ngrok authtoken was rejected (revoked, reset, or you were ' +
+		'removed from the Krokedil account). Get a fresh token from the company dashboard.',
+	ERR_NGROK_108:
+		'The account has hit its simultaneous-agent-session limit. Free personal accounts ' +
+		'allow 1 agent — authenticate with your Krokedil pay-as-you-go token instead; or ' +
+		'stop your other --tunnel runs / check dashboard.ngrok.com → Agents.',
+	ERR_NGROK_313:
+		'Custom domains need a paid plan — your authtoken belongs to a free personal ' +
+		'account. Use your personal token under the Krokedil pay-as-you-go account instead.',
+	ERR_NGROK_320:
+		'The domain is not reserved under the account your authtoken belongs to. ' +
+		'Authenticate with the Krokedil pay-as-you-go token and verify the domain at ' +
+		'dashboard.ngrok.com/domains (see the tunnel domain registry in the shared README).',
+	ERR_NGROK_334:
+		'This tunnel domain is already online — another worktree (yours or a teammate’s) ' +
+		'is serving it. Rerun with --tunnel-domain=none for an ephemeral URL, or use a ' +
+		'second reserved domain via --tunnel-domain=<domain>.',
+};
+
+/**
+ * Look up the actionable hint for an ngrok error code.
+ *
+ * @param {string|null} code An ERR_NGROK_* code, or null.
+ * @return {string|null} The hint, or null for unknown/absent codes.
+ */
+export function hintForNgrokError(code) {
+	return (code && NGROK_ERROR_HINTS[code]) || null;
+}
+
+/**
+ * Extract an error from one line of ngrok output, if it is one.
+ *
+ * With --log=stdout ngrok reports failures as JSON log lines on stdout
+ * (lvl "eror"/"crit", or an `err` field — which is the literal string "<nil>"
+ * on some info lines); some versions also print a plain-text "ERROR: …" block
+ * for fatal startup errors. Exported for tests.
+ *
+ * @param {string} line One line of ngrok output.
+ * @return {{code: string|null, text: string}|null} The error (with any
+ *   ERR_NGROK_* code found in it), or null for non-error lines.
+ */
+export function parseNgrokErrorLine(line) {
+	let text = null;
+	let event;
+	try {
+		event = JSON.parse(line);
+	} catch {
+		event = null;
+	}
+	if (event && typeof event === 'object') {
+		const err =
+			typeof event.err === 'string' && event.err !== '<nil>'
+				? event.err.trim()
+				: '';
+		if (event.lvl === 'eror' || event.lvl === 'crit' || err) {
+			text = [event.msg, err].filter(Boolean).join(': ').trim();
+		}
+	} else if (/ERR_NGROK_\d+/.test(line) || /^ERROR:/.test(line.trim())) {
+		text = line.trim();
+	}
+	if (!text) {
+		return null;
+	}
+	const code = text.match(/(ERR_NGROK_\d+)/)?.[1] ?? null;
+	return { code, text };
+}
+
+/**
  * Poll the local ngrok API for a tunnel URL (fallback when log parsing missed
  * the event, e.g. an unexpected log schema).
  *
@@ -90,15 +172,16 @@ async function pollApi(deadline) {
 /**
  * Start an ngrok tunnel to the local playground port.
  *
- * @param {Object} opts        Options.
- * @param {number} opts.port   Local port to expose.
- * @param {Object} opts.config Normalized plugin config (tunnel.domain).
+ * @param {Object}      opts        Options.
+ * @param {number}      opts.port   Local port to expose.
+ * @param {string|null} opts.domain Reserved domain to serve, or null for an
+ *                                  ephemeral random URL.
  * @return {Promise<{url: string, stop: Function}>} The running tunnel.
  */
-export async function startTunnel({ port, config }) {
+export async function startTunnel({ port, domain = null }) {
 	const args = ['http', String(port), '--log=stdout', '--log-format=json'];
-	if (config.tunnel?.domain) {
-		args.push(`--url=${config.tunnel.domain}`);
+	if (domain) {
+		args.push(`--url=${domain}`);
 	}
 
 	const { default: spawn } = await import('cross-spawn');
@@ -120,6 +203,8 @@ export async function startTunnel({ port, config }) {
 		let settled = false;
 		let stderrTail = '';
 		let buffer = '';
+		/** Last few error lines ngrok logged (stdout JSON under --log=stdout). */
+		const errorLines = [];
 
 		/**
 		 * Settle the promise exactly once.
@@ -148,6 +233,13 @@ export async function startTunnel({ port, config }) {
 				if (found) {
 					settle(found);
 				}
+				const error = parseNgrokErrorLine(line);
+				if (error) {
+					errorLines.push(error);
+					if (errorLines.length > 5) {
+						errorLines.shift();
+					}
+				}
 			}
 		});
 		child.stderr.on('data', (chunk) => {
@@ -164,15 +256,26 @@ export async function startTunnel({ port, config }) {
 			);
 		});
 		child.on('exit', (code) => {
-			// Exited before producing a URL: auth/domain errors land here.
+			// Exited before producing a URL: auth/domain/session errors land
+			// here. Under --log=stdout ngrok reports them as JSON on stdout,
+			// so the collected errorLines are the real story; stderr is a
+			// fallback for anything that bypassed the logger.
+			const details =
+				[...new Set(errorLines.map((e) => e.text))].join('\n') ||
+				stderrTail.trim();
+			let hint = hintForNgrokError(
+				errorLines.find((e) => e.code)?.code ?? null
+			);
+			if (!hint && !process.env.NGROK_AUTHTOKEN) {
+				hint =
+					'set NGROK_AUTHTOKEN or run `ngrok config add-authtoken <token>`.';
+			}
 			pollApi(Date.now() + 1).then(() =>
 				settle(
 					null,
 					`ngrok exited (code ${code}) before the tunnel came up.` +
-						(stderrTail ? `\n${stderrTail.trim()}` : '') +
-						(process.env.NGROK_AUTHTOKEN
-							? ''
-							: '\nHint: set NGROK_AUTHTOKEN or run `ngrok config add-authtoken <token>`.')
+						(details ? `\n${details}` : '') +
+						(hint ? `\nHint: ${hint}` : '')
 				)
 			);
 		});
