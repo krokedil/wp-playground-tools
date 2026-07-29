@@ -155,6 +155,10 @@ Requires [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert &
 
 Playground (PHP-in-WASM) intermittently times out outbound HTTP requests after ~10s. A tunnel fixes *inbound* callbacks, but plugins calling real provider sandbox APIs *outbound* will see sporadic failures unrelated to their code. For serious real-API integration testing, use a conventional environment (wp-env / Docker) — keep Playground for UI/flow work, and consider mocking with `pre_http_request` in tests.
 
+### ⚠ Emails never send — read them in Tools → Email Log
+
+Playground's PHP-in-WASM has no mail transport (no sendmail binary or MTA), so PHP's `mail()` — and with it every `wp_mail()` call — fails. On a WooCommerce site this surfaces as order notes like `Email "Processing order" failed to send: Could not instantiate mail function.` — that's the platform, not the plugin under development. The development blueprint pre-activates [WP Mail Logging](https://wordpress.org/plugins/wp-mail-logging/), which records every attempted email (recipient, subject, full body) even though the send fails: **Tools → Email Log** (`/wp-admin/tools.php?page=wpml_plugin_log`).
+
 ## Port registry
 
 Give each plugin a distinct `basePort` so concurrent plugin development doesn't rely on probing. Claim a row when you onboard a plugin:
