@@ -243,6 +243,12 @@ test('the runtime contract files stay readable under a restrictive umask', (t) =
 			`the runtime must be able to read ${path.basename(file)}`
 		);
 	}
+	// A readable file inside an owner-only directory is still out of reach.
+	assert.notEqual(
+		fs.statSync(path.join(root, '.playground')).mode % 0o10,
+		0,
+		'the runtime must be able to traverse into .playground'
+	);
 });
 
 test('startProxy takes the proxy down when publishing its URL fails', async (t) => {

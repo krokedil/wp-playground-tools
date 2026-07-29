@@ -14,6 +14,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { wpVersionFor } from '../config.mjs';
+import { copyRuntimeReadable } from '../runtime-file.mjs';
 import { pluginContainerPath } from './steps.mjs';
 import * as steps from './steps.mjs';
 
@@ -214,6 +215,9 @@ async function fetchToFile(url, dest, attempts = 3) {
 					`suspiciously small download (${buffer.length} bytes)`
 				);
 			}
+			// Plain write: this is the host-side cache under ~/.config, not
+			// something the runtime reads — copyRuntimeReadable fixes the mode
+			// of the staged copy whatever this file ends up as.
 			fs.writeFileSync(dest, buffer);
 			return;
 		} catch (err) {
@@ -268,7 +272,7 @@ async function stagePluginZips(root, config, blueprint) {
 				continue;
 			}
 		}
-		fs.copyFileSync(cached, path.join(stagedDir, `${slug}.zip`));
+		copyRuntimeReadable(cached, path.join(stagedDir, `${slug}.zip`));
 		step.pluginData = {
 			resource: 'vfs',
 			path: `${pluginContainerPath(config.slug)}/.playground/plugins/${slug}.zip`,
@@ -301,7 +305,7 @@ export async function composeAndStage(root, config, mode) {
 				`playground: mu-plugin not found: ${source} (check config.muPlugins).`
 			);
 		}
-		fs.copyFileSync(source, path.join(muDir, file.name));
+		copyRuntimeReadable(source, path.join(muDir, file.name));
 	}
 
 	// Stage the seed data for the development seeder.
@@ -314,12 +318,18 @@ export async function composeAndStage(root, config, mode) {
 				`playground: seed data not found: ${seedSource} (check config.seedData).`
 			);
 		}
-		fs.copyFileSync(seedSource, path.join(stagingDir, 'seed-data.json'));
+		copyRuntimeReadable(
+			seedSource,
+			path.join(stagingDir, 'seed-data.json')
+		);
 	}
 
 	const blueprint = composeBlueprint(config, mode);
 	await stagePluginZips(root, config, blueprint);
 
+	// Plain write: the blueprint is consumed by the host CLI process that wrote
+	// it, not read back from inside the runtime, so its mode is nobody's
+	// business — and it may carry private options from .env.
 	const blueprintPath = path.join(stagingDir, `blueprint.${mode}.json`);
 	fs.writeFileSync(blueprintPath, JSON.stringify(blueprint, null, 2) + '\n');
 

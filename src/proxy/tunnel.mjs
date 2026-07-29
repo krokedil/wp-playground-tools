@@ -18,37 +18,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+import { writeRuntimeReadable } from '../runtime-file.mjs';
+
 /** Registered tunnel providers. cloudflared etc. are later drop-ins. */
 const PROVIDERS = {
 	ngrok: () => import('./ngrok.mjs'),
 };
-
-/**
- * Write a file the Playground runtime has to read back.
- *
- * The runtime reads the mount as a different uid than the host process, so an
- * owner-only file is unreadable there — and the mu-plugins fail quietly when
- * that happens (an unreadable tunnel-password.txt used to leave the default
- * admin password working on a public URL; an unreadable proxy-url.txt leaves
- * the site serving localhost URLs). Hence an explicit chmod: the mode passed
- * to writeFileSync goes through open(2) and is masked by the caller's umask,
- * so `umask 077` would recreate exactly that bug, while chmod is absolute and
- * also fixes a file that already exists.
- *
- * @param {string} file     Absolute path to write.
- * @param {string} contents File contents.
- */
-function writeRuntimeReadable(file, contents) {
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, contents);
-	try {
-		fs.chmodSync(file, 0o644);
-	} catch (err) {
-		throw new Error(
-			`could not make ${file} readable by the Playground runtime: ${err.message}`
-		);
-	}
-}
 
 /**
  * Path of the proxy URL file inside the plugin's staging dir.
