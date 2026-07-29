@@ -208,14 +208,15 @@ export async function scaffold(root, args) {
 	const pkgRaw = fs.existsSync(pkgPath)
 		? fs.readFileSync(pkgPath, 'utf8')
 		: null;
-	const pkg = pkgRaw
-		? JSON.parse(pkgRaw)
-		: {
-				name: `${slug}-dev`,
-				private: true,
-				type: 'module',
-				version: '0.0.0',
-			};
+	const pkg =
+		pkgRaw !== null
+			? JSON.parse(pkgRaw)
+			: {
+					name: `${slug}-dev`,
+					private: true,
+					type: 'module',
+					version: '0.0.0',
+				};
 	pkg.scripts = pkg.scripts ?? {};
 	const scripts = {
 		...Object.fromEntries(modes.map((mode) => MODE_SCRIPTS[mode])),
@@ -265,9 +266,10 @@ export async function scaffold(root, args) {
 	const launchRaw = fs.existsSync(launchPath)
 		? fs.readFileSync(launchPath, 'utf8')
 		: null;
-	const launch = launchRaw
-		? JSON.parse(launchRaw)
-		: { version: '0.0.1', configurations: [] };
+	const launch =
+		launchRaw !== null
+			? JSON.parse(launchRaw)
+			: { version: '0.0.1', configurations: [] };
 	launch.configurations = (launch.configurations ?? []).filter(
 		(c) => !/^playground-/.test(c.name ?? '')
 	);
