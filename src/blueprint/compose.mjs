@@ -313,8 +313,9 @@ export async function composeAndStage(root, config, mode) {
 			? file.source
 			: path.join(root, file.source);
 		if (!fs.existsSync(source)) {
+			// No "playground:" prefix — the CLI's top-level handler adds it.
 			throw new Error(
-				`playground: mu-plugin not found: ${source} (check config.muPlugins).`
+				`mu-plugin not found: ${source} (check config.muPlugins).`
 			);
 		}
 		copyRuntimeReadable(source, path.join(muDir, file.name));
@@ -327,7 +328,7 @@ export async function composeAndStage(root, config, mode) {
 			: path.join(ASSETS_DIR, 'seed-data', 'default.json');
 		if (!fs.existsSync(seedSource)) {
 			throw new Error(
-				`playground: seed data not found: ${seedSource} (check config.seedData).`
+				`seed data not found: ${seedSource} (check config.seedData).`
 			);
 		}
 		copyRuntimeReadable(

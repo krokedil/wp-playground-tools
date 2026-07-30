@@ -142,6 +142,17 @@ test('server validates its mode against the config, not the launch table', (t) =
 	}
 });
 
+test('server on a start-only plugin explains the modes opt-in', (t) => {
+	const root = tmpPlugin(
+		t,
+		"export default { slug: 'a-plugin', basePort: 9930, modes: ['start'] };\n"
+	);
+	const res = runCli(['server', 'development'], root);
+	assert.equal(res.status, 1);
+	assert.match(res.stderr, /only configures the persistent 'start' mode/);
+	assert.match(res.stderr, /add development\/demo\/e2e to "modes"/);
+});
+
 test('a missing config errors in the package voice, without a stack trace', (t) => {
 	const root = tmpPlugin(t);
 	const res = runCli(['compose'], root);
@@ -151,4 +162,15 @@ test('a missing config errors in the package voice, without a stack trace', (t) 
 		/✖ playground: playground\.config\.mjs: not found/
 	);
 	assert.doesNotMatch(res.stderr, /at .*config\.mjs:\d/);
+});
+
+test('staging errors carry exactly one playground prefix', (t) => {
+	const root = tmpPlugin(
+		t,
+		"export default { slug: 'a-plugin', basePort: 9930, woocommerce: false, muPlugins: ['tools/nope.php'] };\n"
+	);
+	const res = runCli(['compose'], root);
+	assert.equal(res.status, 1);
+	assert.match(res.stderr, /✖ playground: mu-plugin not found/);
+	assert.doesNotMatch(res.stderr, /playground: playground:/);
 });

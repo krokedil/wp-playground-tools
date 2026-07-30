@@ -98,6 +98,14 @@ export function normalizePerMode(value, name, kind) {
 		return Object.fromEntries(BLUEPRINT_MODES.map((m) => [m, value]));
 	}
 
+	// A primitive would fall through the key checks below as an object with no
+	// keys and silently normalize to empty per-mode values.
+	if (typeof value !== 'object') {
+		fail(
+			`"${name}" must be ${kind === 'array' ? 'an array or a per-mode object' : 'an object'}, got ${JSON.stringify(value)}.`
+		);
+	}
+
 	const allowedKeys = ['all', ...BLUEPRINT_MODES];
 	const unknown = Object.keys(value).filter((k) => !allowedKeys.includes(k));
 	if (unknown.length) {

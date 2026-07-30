@@ -261,6 +261,17 @@ test('https.hosts must be a non-empty string array', () => {
 	assert.deepEqual(config.https.hosts, ['app.localhost']);
 });
 
+test('per-mode keys reject primitives instead of normalizing to empty', () => {
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', pages: 42 }),
+		/"pages" must be an array or a per-mode object/
+	);
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', options: 'x' }),
+		/"options" must be an object/
+	);
+});
+
 test('pages entries need string title, slug and content', () => {
 	assert.throws(
 		() =>

@@ -166,15 +166,19 @@
   see); `KROKEDIL_PG_DEBUG=1` restores the stack.
 - CLI: `--help`/`-h` (full command + flag reference on stdout) and
   `--version`; `server` validates its mode against the plugin's configured
-  modes instead of failing later with `setup`/`start` listed as suggestions;
-  `compose` on a `modes: ['start']` plugin composes the development blueprint
-  (what `start` boots) instead of silently writing nothing.
+  modes instead of failing later with `setup`/`start` listed as suggestions
+  (a start-only plugin is told to opt into blueprint modes rather than shown
+  an empty list); `compose` on a `modes: ['start']` plugin composes the
+  development blueprint (what `start` boots) instead of silently writing
+  nothing.
 - Config validation: malformed `composer.markers`, `modes`, `activate`,
   `https.hosts`, `pages` entries, `php`, `wp` and `screenshots` now fail at
   load with actionable messages instead of unrelated TypeErrors deep in the
   launch (a string `https.hosts` used to spread character-by-character into
-  the mkcert SANs). An explicit `composer: null` now opts out of composer
-  install even when a `composer.json` exists, as documented.
+  the mkcert SANs), and the per-mode keys (`options`, `pages`, `muPlugins`,
+  `extraSteps`) reject primitives instead of normalizing them to empty. An
+  explicit `composer: null` now opts out of composer install even when a
+  `composer.json` exists, as documented.
 - Fix: Ctrl+C during ngrok/mkcert startup (a window of up to ~20 s) killed the
   launcher but orphaned the Playground child — and sometimes a live ngrok
   agent holding the reserved domain; signals are now mirrored into the child

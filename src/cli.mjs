@@ -108,8 +108,8 @@ export async function main(argv = process.argv.slice(2)) {
 		// One place turns every thrown Error (config validation, staging,
 		// unknown blueprint mode, …) into the package's own error line instead
 		// of a raw stack trace. KROKEDIL_PG_DEBUG=1 keeps the stack.
-		process.stderr.write(`✖ playground: ${err.message}\n`);
-		if (process.env.KROKEDIL_PG_DEBUG) {
+		process.stderr.write(`✖ playground: ${err?.message ?? String(err)}\n`);
+		if (process.env.KROKEDIL_PG_DEBUG && err?.stack) {
 			process.stderr.write(`${err.stack}\n`);
 		}
 		process.exitCode = 1;
@@ -173,6 +173,12 @@ async function run(argv) {
 			// Validate here: launch()'s mode table also holds setup/start,
 			// which are not `server` modes and must not be suggested.
 			const serverModes = config.modes.filter((m) => m !== 'start');
+			if (!serverModes.length) {
+				throw new Error(
+					`this plugin only configures the persistent 'start' mode — ` +
+						`add development/demo/e2e to "modes" in playground.config.mjs to use server.`
+				);
+			}
 			if (!mode || !serverModes.includes(mode)) {
 				throw new Error(
 					`server needs a mode: ${serverModes.join(' | ')}` +
