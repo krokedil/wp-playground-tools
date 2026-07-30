@@ -46,11 +46,74 @@ function displayPath(file) {
 }
 
 /**
+ * Blank out line and block comments, keeping the code (and newlines) intact.
+ *
+ * The scans below are text scans, so commented-out examples would otherwise
+ * count as real calls — the scaffolded config ships one (`envSecret(
+ * 'MY_TEST_SECRET' )`), and every commented example would leak a bogus stub
+ * into the shared central file. A small state walk rather than a regex,
+ * because quotes and comment markers nest both ways: `// see 'X'` is a
+ * comment, `'https://…'` is a string. Regex literals are not tracked (a
+ * config has no use for one, and division never precedes `/` or `*`).
+ *
+ * @param {string} source JavaScript source text.
+ * @return {string} The source with comment bodies removed.
+ */
+export function stripComments(source) {
+	let out = '';
+	let i = 0;
+	while (i < source.length) {
+		const char = source[i];
+		const next = source[i + 1];
+		if (char === '/' && next === '/') {
+			const end = source.indexOf('\n', i);
+			i = end === -1 ? source.length : end;
+			continue;
+		}
+		if (char === '/' && next === '*') {
+			const end = source.indexOf('*/', i + 2);
+			const body = source.slice(i, end === -1 ? source.length : end + 2);
+			// Keep the newlines so line numbers and line-based scans survive.
+			out += body.replace(/[^\n]/g, '');
+			i = end === -1 ? source.length : end + 2;
+			continue;
+		}
+		if (char === "'" || char === '"' || char === '`') {
+			out += char;
+			i++;
+			while (i < source.length) {
+				const inner = source[i];
+				out += inner;
+				i++;
+				if (inner === '\\') {
+					// An escape consumes the next character, quote included.
+					if (i < source.length) {
+						out += source[i];
+						i++;
+					}
+					continue;
+				}
+				// A bare newline ends an unterminated '/" string: the source
+				// is broken anyway, and stopping keeps the walk in step.
+				if (inner === char || (char !== '`' && inner === '\n')) {
+					break;
+				}
+			}
+			continue;
+		}
+		out += char;
+		i++;
+	}
+	return out;
+}
+
+/**
  * Statically extract the env-var names a config reads via envSecret().
  *
  * Text scan only — envSecret('NAME') / envSecret("NAME") / envSecret(`NAME`)
- * with a plain literal. Calls with computed arguments (variables, template
- * interpolation) are counted as skipped so the caller can say so.
+ * with a plain literal, in code and never in a comment. Calls with computed
+ * arguments (variables, template interpolation) are counted as skipped so the
+ * caller can say so.
  *
  * @param {string} source The playground.config.mjs source text.
  * @return {{names: string[], skipped: number}} Deduplicated names in source
@@ -59,7 +122,7 @@ function displayPath(file) {
 export function scanEnvSecretNames(source) {
 	const names = new Set();
 	let skipped = 0;
-	for (const match of source.matchAll(
+	for (const match of stripComments(source).matchAll(
 		/\benvSecret\s*\(\s*(?:(['"`])((?:(?!\1)[^\\\n${}])*)\1)?/g
 	)) {
 		const name = match[2];
@@ -176,7 +239,9 @@ export function runCredentials(
 		process.exitCode = 1;
 		return null;
 	}
-	const source = fs.readFileSync(configPath, 'utf8');
+	// Commented-out examples are not configuration: scan the code only, or the
+	// scaffolded config's own envSecret() example lands in the central file.
+	const source = stripComments(fs.readFileSync(configPath, 'utf8'));
 	const { names, skipped } = scanEnvSecretNames(source);
 	if (skipped) {
 		log(
