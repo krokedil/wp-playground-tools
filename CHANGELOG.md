@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Repo-internal workflow polish (nothing consumer-visible): opened PRs get an
+  automatic Copilot review request, CI runs superseded by a newer push to the
+  same PR are cancelled, a PR template reminds about the changelog convention,
+  and a release-guard workflow fails a `vX.Y.Z` tag push whose version doesn't
+  match `package.json` and the changelog heading.
 - Docs: transport decision guide. The README's HTTPS section is now
   "Transports" and opens with a which-transport-for-which-work table (plain
   http for admin/backend work, `--https` for checkout/secure-context flows,
