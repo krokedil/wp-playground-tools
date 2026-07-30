@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- The central credentials file (`~/.config/krokedil-playground/.env`) is now
+  chmodded owner-only (0600) on every `credentials`/`init` run that finds or
+  writes it — `writeFileSync`'s mode is masked by the caller's umask, so
+  without an explicit chmod the file holding API keys could be created
+  world-readable on multi-user machines. A permissive file created by 1.2.0
+  is tightened even when there are no new stubs to append, and
+  `credentials.env.example` now tells copiers to `chmod 600` their copy.
+
 ## 1.2.0 — 2026-07-30
 
 **Upgrade notes** — `#semver:^1` consumers get all of this on a plain `pnpm update`:

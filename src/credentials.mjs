@@ -73,14 +73,35 @@ export function scanEnvSecretNames(source) {
 }
 
 /**
+ * Best-effort chmod to owner-only — the file holds credentials.
+ *
+ * An explicit chmod because writeFileSync's mode option is masked by the
+ * caller's umask (see src/runtime-file.mjs), and because it also tightens a
+ * file created permissive by an earlier version. Best-effort: chmod is a
+ * near-noop on Windows and may fail on exotic filesystems, and the stubs are
+ * more important than the mode.
+ *
+ * @param {string} file Env file path (absolute).
+ */
+function chmodOwnerOnly(file) {
+	try {
+		fs.chmodSync(file, 0o600);
+	} catch {
+		// Permissions stay the caller's.
+	}
+}
+
+/**
  * Append commented stubs for unknown names to an env file, under a heading.
  *
  * A name is known when any line — set, commented stub, or `export`-prefixed —
  * already carries `NAME=`. Existing lines are never modified, so re-runs are
  * idempotent and filled-in values are never touched. The file (and its
- * directory) is created when missing. Both inputs are sanitized before they
- * touch the shared file: non-identifier names are dropped, and the heading is
- * collapsed to a single line (a newline in either would inject env lines).
+ * directory) is created when missing, and chmodded owner-only (0600) on every
+ * call that finds or writes it — it holds credentials. Both inputs are
+ * sanitized before they touch the shared file: non-identifier names are
+ * dropped, and the heading is collapsed to a single line (a newline in either
+ * would inject env lines).
  *
  * @param {string[]} names             Names to ensure stubs for.
  * @param {string}   file              Env file path (absolute).
@@ -93,6 +114,11 @@ export function ensureCredentialStubs(names, file, { heading } = {}) {
 	names = names.filter((name) => VALID_NAME.test(name));
 	heading = heading?.replace(/\p{Cc}+/gu, ' ').trim();
 	const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+	if (existing !== null) {
+		// Tighten a pre-existing permissive file (e.g. created before the
+		// chmod existed) even when there turns out to be nothing to append.
+		chmodOwnerOnly(file);
+	}
 	const known = new Set();
 	for (const line of (existing ?? '').split('\n')) {
 		const match = line.match(
@@ -119,6 +145,7 @@ export function ensureCredentialStubs(names, file, { heading } = {}) {
 	}
 	body += missing.map((name) => `# ${name}=`).join('\n') + '\n';
 	fs.writeFileSync(file, body);
+	chmodOwnerOnly(file);
 	return { created: existing === null, stubbed: missing };
 }
 

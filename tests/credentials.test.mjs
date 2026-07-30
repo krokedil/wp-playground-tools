@@ -85,6 +85,11 @@ test('ensureCredentialStubs creates the file (and directory) with a heading', (t
 		fs.readFileSync(file, 'utf8'),
 		'# --- my-plugin ---\n# KEY_A=\n# KEY_B=\n'
 	);
+	// The file will hold credentials — owner-only regardless of umask.
+	// `% 0o1000` is the permission digits (no-bitwise forbids `&`).
+	if (process.platform !== 'win32') {
+		assert.equal(fs.statSync(file).mode % 0o1000, 0o600);
+	}
 });
 
 test('ensureCredentialStubs is idempotent and never touches existing lines', (t) => {
@@ -115,6 +120,27 @@ test('ensureCredentialStubs is idempotent and never touches existing lines', (t)
 	);
 	assert.deepEqual(second.stubbed, []);
 	assert.equal(fs.readFileSync(file, 'utf8'), body);
+});
+
+test('ensureCredentialStubs tightens a permissive file even with nothing to append', (t) => {
+	if (process.platform === 'win32') {
+		return;
+	}
+	const root = makeRoot(t);
+	const file = path.join(root, '.env');
+	// The steady state after upgrading: a world-readable file from a version
+	// without the chmod, already holding every name.
+	const existing = 'KEY_SET=value-123\n# KEY_STUB=\n';
+	fs.writeFileSync(file, existing);
+	fs.chmodSync(file, 0o644);
+
+	const result = ensureCredentialStubs(['KEY_SET', 'KEY_STUB'], file, {
+		heading: 'my-plugin',
+	});
+	assert.deepEqual(result, { created: false, stubbed: [] });
+	assert.equal(fs.readFileSync(file, 'utf8'), existing);
+	// `% 0o1000` is the permission digits (no-bitwise forbids `&`).
+	assert.equal(fs.statSync(file).mode % 0o1000, 0o600);
 });
 
 test('ensureCredentialStubs sanitizes the heading and drops invalid names', (t) => {
