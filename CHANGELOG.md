@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.1 — 2026-07-30
 
 - The central credentials file (`~/.config/krokedil-playground/.env`) is now
   chmodded owner-only (0600) on every `credentials`/`init` run that finds or
