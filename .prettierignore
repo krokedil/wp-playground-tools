@@ -2,3 +2,8 @@
 # consumer repos — no formatting churn on shipped files.
 src/init/templates/
 assets/
+
+# Nested git worktrees are whole checkouts of this repo. Ignore patterns are
+# relative to this file, so the rules above miss their copies — without this,
+# every worktree re-reports the shipped templates as errors.
+.claude/worktrees/

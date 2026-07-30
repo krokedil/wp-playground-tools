@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- `pnpm run lint` and `pnpm run format:check` now ignore `.claude/worktrees/`,
+  so keeping git worktrees inside the checkout no longer drowns the real
+  output. A nested worktree is a whole copy of this repo, and ignore patterns
+  are relative to the ignore file — `src/init/templates/` matched only the
+  top-level copy, so every worktree re-reported the deliberately unformatted
+  shipped templates (six worktrees ≈ 130 eslint errors and 5 prettier
+  warnings, none of them from this repo's own files). CI never saw it, since a
+  clean checkout has no nested worktrees.
+
 ## 1.2.3 — 2026-07-30
 
 - The `envSecret()` scan behind `credentials` (and behind `init`) now strips
