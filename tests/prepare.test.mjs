@@ -73,8 +73,11 @@ test('buildModes derives ports, mount and blueprints from config', () => {
 	assert.ok(modes.setup.setupOnly);
 
 	const mount = '.:/wordpress/wp-content/plugins/my-plugin';
+	// --no-login (start defaults login to true): the CLI's per-client
+	// auto-login redirect-loops cookie-less clients;
+	// playground-dev-login.php owns local login (see buildModes).
 	assert.deepEqual(modes.start.flags, [
-		'--login',
+		'--no-login',
 		'--no-auto-mount',
 		`--mount=${mount}`,
 	]);
@@ -98,10 +101,10 @@ test('buildModes includes e2e only when configured', () => {
 });
 
 test('buildLaunchArgs orders subcommand, flags, injected, forwarded', () => {
-	const mode = { subcommand: 'start', flags: ['--login'] };
+	const mode = { subcommand: 'start', flags: ['--no-auto-mount'] };
 	assert.deepEqual(buildLaunchArgs(mode, ['--reset'], ['--xdebug']), [
 		'start',
-		'--login',
+		'--no-auto-mount',
 		'--reset',
 		'--xdebug',
 	]);

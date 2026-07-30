@@ -58,8 +58,9 @@ function muPluginFiles(config, mode) {
 		},
 	];
 	if (mode === 'development') {
-		// wp-login.php auto-submits as admin: the CLI's own `login: true` is
-		// single-shot and any health-check request consumes it.
+		// wp-login.php auto-submits as admin. The CLI's own login is disabled
+		// in development (see composeBlueprint): it re-logs-in every request
+		// without its marker cookie, so cookie-less clients redirect-loop.
 		files.push({
 			name: 'playground-dev-login.php',
 			source: path.join(
@@ -111,6 +112,7 @@ export function composeBlueprint(config, mode) {
 	if (development || mode === 'demo') {
 		list.push(steps.debugConsts(development));
 	}
+	list.push(steps.disableAutoUpdates());
 	list.push(steps.reset(development));
 	list.push(steps.removeDefaultPlugins());
 	list.push(...steps.storefrontTheme());
@@ -169,7 +171,14 @@ export function composeBlueprint(config, mode) {
 			wp: wpVersionFor(config.wp, mode),
 		},
 		landingPage: defaults.landing ?? config.landingPage,
-		login: true,
+		// Development: the CLI's auto-login runs per client — any request
+		// without its marker cookie gets a full admin login plus a 302 back
+		// to itself, so curl probes and CI health checks loop until
+		// max-redirects and every retry writes another session row.
+		// playground-dev-login.php covers local login instead.
+		// Demo/e2e keep it: they're browser/Playwright sessions that hold
+		// cookies, and landing logged-in on plugins.php is their contract.
+		login: !development,
 		steps: list,
 	};
 }

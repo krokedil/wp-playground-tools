@@ -20,6 +20,7 @@
 		"src",
 		"assets",
 		"docs",
+		"scripts",
 		"README.md",
 		"CHANGELOG.md"
 	],

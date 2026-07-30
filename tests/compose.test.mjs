@@ -157,7 +157,14 @@ for (const mode of ['development', 'demo', 'e2e']) {
 			reference.preferredVersions
 		);
 		assert.equal(composed.landingPage, reference.landingPage);
-		assert.equal(composed.login, reference.login);
+		// Deliberate divergence in development: the CLI's auto-login is
+		// per-client (cookie-less clients redirect-loop, each pass writing a
+		// session), so the composer turns it off there —
+		// playground-dev-login.php owns local login instead.
+		assert.equal(
+			composed.login,
+			mode === 'development' ? false : reference.login
+		);
 	});
 }
 
@@ -191,6 +198,20 @@ test('the auto-login mu-plugin stays out of demo/e2e blueprints', () => {
 	for (const mode of ['demo', 'e2e']) {
 		const code = JSON.stringify(composeBlueprint(rwwcConfig, mode).steps);
 		assert.ok(!code.includes('playground-dev-login.php'));
+	}
+});
+
+test('every mode disables the background auto-updater, persisted in wp-config', () => {
+	for (const mode of ['development', 'demo', 'e2e']) {
+		const step = composeBlueprint(rwwcConfig, mode).steps.find(
+			(s) =>
+				s.step === 'defineWpConfigConsts' &&
+				s.consts.AUTOMATIC_UPDATER_DISABLED
+		);
+		assert.ok(step, `AUTOMATIC_UPDATER_DISABLED missing in ${mode}`);
+		// rewrite-wp-config: the define must survive warm boots, which skip
+		// the blueprint (define-before-run is per-boot only).
+		assert.equal(step.method, 'rewrite-wp-config');
 	}
 });
 
