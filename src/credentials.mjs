@@ -78,8 +78,9 @@ export function scanEnvSecretNames(source) {
  * A name is known when any line — set, commented stub, or `export`-prefixed —
  * already carries `NAME=`. Existing lines are never modified, so re-runs are
  * idempotent and filled-in values are never touched. The file (and its
- * directory) is created when missing. Both inputs are sanitized before they
- * touch the shared file: non-identifier names are dropped, and the heading is
+ * directory) is created when missing, and chmodded owner-only (0600) on every
+ * write — it holds credentials. Both inputs are sanitized before they touch
+ * the shared file: non-identifier names are dropped, and the heading is
  * collapsed to a single line (a newline in either would inject env lines).
  *
  * @param {string[]} names             Names to ensure stubs for.
@@ -119,6 +120,16 @@ export function ensureCredentialStubs(names, file, { heading } = {}) {
 	}
 	body += missing.map((name) => `# ${name}=`).join('\n') + '\n';
 	fs.writeFileSync(file, body);
+	// The file will hold credentials, and writeFileSync's mode option is
+	// masked by the caller's umask (see src/runtime-file.mjs) — only an
+	// explicit chmod deterministically keeps it owner-only, and it also
+	// tightens a file left permissive by an earlier run. Best-effort: chmod
+	// is a near-noop on Windows and may fail on exotic filesystems.
+	try {
+		fs.chmodSync(file, 0o600);
+	} catch {
+		// The stubs are written either way; permissions stay the caller's.
+	}
 	return { created: existing === null, stubbed: missing };
 }
 
