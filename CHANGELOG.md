@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+- Generated blueprints now disable WordPress's background automatic updater
+  (`AUTOMATIC_UPDATER_DISABLED`, written into the site's `wp-config.php` so
+  warm boots keep it). Playground sites are throwaway and version-pinned, so
+  a background core/plugin/translation update never helps — and it actively
+  breaks the CLI's multi-worker runtime: the updater's file churn in one PHP
+  worker desyncs the other workers' views of the shared site filesystem
+  (observed: minutes of every-request fatals over a `.maintenance` file that
+  no longer exists), and its write burst lands on the same SQLite database
+  the other workers are serving. Existing persistent sites pick this up on
+  their next `--fresh`. A manual stress harness ships as
+  `scripts/stress-db.mjs` (fresh boot → concurrent login/logout write burst
+  → `PRAGMA integrity_check`) to catch regressions of this class.
+
+- Development mode no longer enables the Playground CLI's own auto-login
+  (`start` now passes `--no-login` — the CLI defaults it to on — and the
+  development blueprint sets `login: false`). That auto-login is per client:
+  every request without its marker cookie gets a full admin login plus a 302
+  back to itself, so cookie-less clients — curl probes, health checks, CI
+  smoke tests — looped until max-redirects while writing a new session row
+  on every pass (needless concurrent SQLite writes on a multi-worker
+  server). The staged `playground-dev-login.php` mu-plugin is now the only
+  login magic locally: visiting wp-admin still signs you in as `admin`,
+  `?krokedil-guest=1/0` still works, and demo/e2e blueprints keep
+  `login: true` (browser sessions that hold cookies, landing logged-in on
+  plugins.php). Cookie-less `curl -L` of `/` and `/wp-json` now returns 200.
+
 ## 1.2.1 — 2026-07-30
 
 - The central credentials file (`~/.config/krokedil-playground/.env`) is now

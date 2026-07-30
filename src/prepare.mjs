@@ -88,9 +88,15 @@ export function buildModes(config) {
 		modes.start = {
 			port: config.basePort + MODE_PORT_OFFSETS.start,
 			subcommand: 'start',
+			// --no-login (start defaults login to TRUE): the CLI's auto-login
+			// logs in every request that lacks its marker cookie (302 + a fresh
+			// session row), so cookie-less clients — curl probes, health checks
+			// — redirect-loop forever while hammering the DB with concurrent
+			// session writes. Local login is owned by the staged
+			// playground-dev-login.php instead.
 			// --no-auto-mount: `start` auto-mounts the cwd under its directory
 			// name, which double-mounts worktrees and fatals on plugin redeclare.
-			flags: ['--login', '--no-auto-mount', `--mount=${mount}`],
+			flags: ['--no-login', '--no-auto-mount', `--mount=${mount}`],
 			blueprint: blueprintPath('development'),
 			blueprintMode: 'development',
 			persistent: true,

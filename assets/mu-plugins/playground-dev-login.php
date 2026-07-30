@@ -3,14 +3,14 @@
  * Plugin Name: Playground Dev Login
  * Description: Auto-submits the wp-login.php form as admin (development blueprint only). Part of @krokedil/wp-playground-tools; staged into .playground/mu-plugins/ and symlinked into mu-plugins/.
  *
- * Playground's own auto-login (blueprint `login: true`) is single-shot per
- * client: the first HTTP request consumes it, so a curl health check or a
- * tool's probe eats the login and the developer's first real visit lands on
- * the wp-login form — and after `--fresh` the wiped sessions demand a manual
- * login again. This mu-plugin removes the form from the dev loop instead:
- * any plain GET of wp-login.php while logged out signs in as `admin` and
- * follows redirect_to. It never triggers outside wp-login.php, so the
- * storefront stays guest-browsable.
+ * Playground's own auto-login (blueprint `login: true`) is per client: every
+ * HTTP request without its marker cookie gets a full admin login plus a 302
+ * back to itself, so a cookie-less curl probe or health check redirect-loops
+ * forever while writing a session row per attempt. The tooling therefore
+ * doesn't enable it in development mode; this mu-plugin removes the login
+ * form from the dev loop instead: any plain GET of wp-login.php while logged
+ * out signs in as `admin` and follows redirect_to. It never triggers outside
+ * wp-login.php, so the storefront stays guest-browsable.
  *
  * Deliberate login flows keep the form: POST submissions (signing in as a
  * different user), any ?action=… (logout, lostpassword, rp — or an explicit

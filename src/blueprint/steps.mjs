@@ -38,6 +38,31 @@ export function debugConsts(enabled) {
 }
 
 /**
+ * Turn off WordPress's background automatic updater (core, plugins, themes,
+ * translations) — every mode.
+ *
+ * Playground sites are throwaway and version-pinned by the blueprint, so a
+ * background update never helps — and it actively breaks the multi-worker
+ * runtime: the updater's file churn from one PHP worker desyncs the other
+ * workers' views of the shared filesystem (observed: every request fatals on
+ * a `.maintenance` file that no longer exists), and its burst of writes lands
+ * on the same SQLite file the other workers are serving from.
+ *
+ * @return {Object} defineWpConfigConsts step.
+ */
+export function disableAutoUpdates() {
+	return {
+		step: 'defineWpConfigConsts',
+		// rewrite-wp-config, not the define-before-run default: that one only
+		// defines constants for the boot that runs the blueprint, and warm
+		// boots of the persistent site skip the blueprint — the constant must
+		// live in the site's wp-config.php to hold across relaunches.
+		method: 'rewrite-wp-config',
+		consts: { AUTOMATIC_UPDATER_DISABLED: true },
+	};
+}
+
+/**
  * Reset the site content. The persistent development site uses `wp site empty`
  * (keeps users/options so a re-applied blueprint stays idempotent); ephemeral
  * servers use the CLI's full resetData.
