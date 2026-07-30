@@ -5,6 +5,15 @@
 - Registry bookkeeping for onboarding qliro-for-woocommerce: `basePort` 8900
   claimed in the port registry, and the plugin's `QLIRO_TEST_API_KEY` /
   `QLIRO_TEST_API_SECRET` names documented in `credentials.env.example`.
+- The example `basePort` in the scaffolded config *and* in the README's schema
+  block now both point at the registry's free row (8910), and a test pins them
+  there. Claiming a port used to leave the examples pointing at it: 8890 was
+  klarna-payments' row (fixed in 1.2.0, see below), 8900 then became qliro's.
+  The README schema example was the worse of the two — it was 8880,
+  returns-and-withdrawals' row, and copying it *sets* `basePort`, so the
+  "unset basePort" warning never fired and the collision was silent. The test
+  parses the registry table, so the next claim fails CI until both examples and
+  the "next plugin here" row move together.
 
 ## 1.2.2 — 2026-07-30
 

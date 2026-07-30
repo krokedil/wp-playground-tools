@@ -461,3 +461,70 @@ test('scaffold --update respects a custom basePort from the config', async (t) =
 	const start = launch.configurations.find((c) => /-start$/.test(c.name));
 	assert.equal(start.port, 8890);
 });
+
+/**
+ * Read the README's port registry table.
+ *
+ * @return {{ claimed: Map<number, string>, nextFree: number|null }} Claimed
+ *         rows by port, and the port of the "next plugin here" row.
+ */
+function parsePortRegistry() {
+	const readme = fs.readFileSync(
+		new URL('../README.md', import.meta.url),
+		'utf8'
+	);
+	const section = /^## Port registry$([\s\S]*?)^## /m.exec(readme);
+	assert.ok(section, 'README.md: the "## Port registry" section is missing');
+
+	const claimed = new Map();
+	let nextFree = null;
+	for (const [, port, plugin] of section[1].matchAll(
+		/^\|\s*(\d+)\s*\|\s*(.+?)\s*\|$/gm
+	)) {
+		if (/next plugin here/.test(plugin)) {
+			nextFree = Number(port);
+		} else {
+			claimed.set(Number(port), plugin);
+		}
+	}
+	return { claimed, nextFree };
+}
+
+// The commented-out example in the scaffolded config and the schema example in
+// the README are copy-paste bait: a plugin that keeps either verbatim silently
+// takes another plugin's ports. That has happened twice (8890 was klarna's row,
+// then 8900 became qliro's — see the 1.2.0 changelog entry), so both examples
+// are pinned to the registry's free row rather than trusted to be hand-synced.
+test('the example basePort in the template and README is the registry’s next free row', () => {
+	const { claimed, nextFree } = parsePortRegistry();
+	assert.ok(
+		claimed.size >= 3 && nextFree !== null,
+		'README.md: the port registry table did not parse — it needs claimed rows and a "next plugin here" row'
+	);
+
+	const examples = [
+		[
+			'src/init/templates/playground.config.template.mjs',
+			/^\s*\/\/ basePort: (\d+),/m,
+		],
+		['README.md', /^\tbasePort: (\d+),/m],
+	];
+	for (const [file, pattern] of examples) {
+		const found = pattern.exec(
+			fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')
+		);
+		assert.ok(found, `${file}: no example basePort found`);
+
+		const port = Number(found[1]);
+		const owner = claimed.get(port);
+		assert.equal(
+			port,
+			nextFree,
+			`${file}: the example basePort ${port} ${
+				owner
+					? `is ${owner}'s claimed registry row`
+					: 'is not the registry’s free row'
+			} — when a port is claimed, move both examples (and the "next plugin here" row) to ${nextFree}`
+		);
+	}
+});
