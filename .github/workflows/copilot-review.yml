@@ -1,0 +1,24 @@
+# The ruleset toggle for automatic Copilot review ("Request pull request
+# review from Copilot") is not settable via the REST/GraphQL APIs on this
+# plan, so this workflow requests the review instead.
+name: Request Copilot review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request review from Copilot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X POST \
+            "/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/requested_reviewers" \
+            -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
