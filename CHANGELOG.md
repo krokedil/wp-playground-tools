@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-07-30
 
 **Upgrade notes** — `#semver:^1` consumers get all of this on a plain `pnpm update`:
 
