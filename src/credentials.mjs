@@ -78,7 +78,9 @@ export function scanEnvSecretNames(source) {
  * A name is known when any line — set, commented stub, or `export`-prefixed —
  * already carries `NAME=`. Existing lines are never modified, so re-runs are
  * idempotent and filled-in values are never touched. The file (and its
- * directory) is created when missing.
+ * directory) is created when missing. Both inputs are sanitized before they
+ * touch the shared file: non-identifier names are dropped, and the heading is
+ * collapsed to a single line (a newline in either would inject env lines).
  *
  * @param {string[]} names             Names to ensure stubs for.
  * @param {string}   file              Env file path (absolute).
@@ -88,6 +90,8 @@ export function scanEnvSecretNames(source) {
  *                                                 created, and the appended names.
  */
 export function ensureCredentialStubs(names, file, { heading } = {}) {
+	names = names.filter((name) => VALID_NAME.test(name));
+	heading = heading?.replace(/\p{Cc}+/gu, ' ').trim();
 	const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 	const known = new Set();
 	for (const line of (existing ?? '').split('\n')) {

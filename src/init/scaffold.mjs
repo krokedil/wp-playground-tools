@@ -441,7 +441,7 @@ export async function scaffold(root, args, { credentials = {} } = {}) {
 		const { runCredentials } = await import('../credentials.mjs');
 		runCredentials(root, credentials);
 	} catch (err) {
-		log(`credentials check skipped (${err.message})`);
+		log(`credentials check skipped (${err?.message ?? err})`);
 	}
 
 	log(

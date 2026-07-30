@@ -171,7 +171,7 @@ export function applyEnvFile(
 		}
 		if (malformed) {
 			warn(
-				`${file} has a malformed line (entries must be NAME=value); ` +
+				`${label} has a malformed line (entries must be NAME=value); ` +
 					'some variables may be ignored.'
 			);
 		}

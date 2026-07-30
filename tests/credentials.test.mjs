@@ -117,6 +117,23 @@ test('ensureCredentialStubs is idempotent and never touches existing lines', (t)
 	assert.equal(fs.readFileSync(file, 'utf8'), body);
 });
 
+test('ensureCredentialStubs sanitizes the heading and drops invalid names', (t) => {
+	const root = makeRoot(t);
+	const file = path.join(root, '.env');
+	// A newline in the heading or a non-identifier name would otherwise
+	// inject arbitrary lines into the shared central file.
+	const result = ensureCredentialStubs(
+		['KEY_OK', 'EVIL=x\nINJECTED', 'not a name'],
+		file,
+		{ heading: 'my-plugin\nEVIL_HEADING=1' }
+	);
+	assert.deepEqual(result.stubbed, ['KEY_OK']);
+	assert.equal(
+		fs.readFileSync(file, 'utf8'),
+		'# --- my-plugin EVIL_HEADING=1 ---\n# KEY_OK=\n'
+	);
+});
+
 test('ensureCredentialStubs recognizes export-prefixed values as known', (t) => {
 	const root = makeRoot(t);
 	const file = path.join(root, '.env');
