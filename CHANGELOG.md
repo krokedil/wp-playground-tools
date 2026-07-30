@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Registry bookkeeping for onboarding qliro-for-woocommerce: `basePort` 8900
+  claimed in the port registry, and the plugin's `QLIRO_TEST_API_KEY` /
+  `QLIRO_TEST_API_SECRET` names documented in `credentials.env.example`.
+
 ## 1.2.2 — 2026-07-30
 
 - Generated blueprints now disable WordPress's background automatic updater

@@ -188,7 +188,8 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 |---|---|
 | 8880 | returns-and-withdrawals |
 | 8890 | klarna-payments-for-woocommerce |
-| 8900 | *(next plugin here)* |
+| 8900 | qliro-for-woocommerce |
+| 8910 | *(next plugin here)* |
 | 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
 
 8880 is also the tool's fallback when `basePort` is unset (returns-and-withdrawals claims it explicitly) — never rely on the fallback; the tool warns on every run until `basePort` is set.
