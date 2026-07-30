@@ -11,6 +11,14 @@
   warnings, none of them from this repo's own files). CI never saw it, since a
   clean checkout has no nested worktrees.
 
+- The section heading that `credentials` writes into the central env file now
+  always comes from the config's real `slug`, never from one inside a comment.
+  The scaffolded config ships a commented `pages:` example carrying
+  `slug: 'checkout-test'`, and only its position kept that out of the shared
+  file: the real `slug` sits earlier, and the first match wins. Each scan now
+  strips comments for itself — `scanEnvSecretNames()` internally for the
+  names, and `credentials` a separate copy for the slug.
+
 ## 1.2.3 — 2026-07-30
 
 - The `envSecret()` scan behind `credentials` (and behind `init`) now strips

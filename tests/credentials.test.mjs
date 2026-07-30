@@ -243,6 +243,26 @@ test('runCredentials scans the config, reports, and stubs the central file', (t)
 	assert.ok(!output.includes('m-123'));
 });
 
+test('runCredentials ignores a commented-out slug when naming the section', (t) => {
+	captureStderr(t);
+	// The scaffolded config's commented `pages:` example carries a slug of its
+	// own; only the real one may name a section in the shared central file.
+	const root = makeRoot(
+		t,
+		'export default {\n' +
+			"\t// pages: { all: [ { title: 'Checkout', slug: 'checkout-test' } ] },\n" +
+			"\tslug: 'my-gateway',\n" +
+			"\to: envSecret('GATEWAY_TEST_SECRET'),\n" +
+			'};\n'
+	);
+	const globalFile = path.join(root, 'central', '.env');
+
+	runCredentials(root, { env: {}, globalFile });
+	const body = fs.readFileSync(globalFile, 'utf8');
+	assert.ok(body.includes('# --- my-gateway ---\n# GATEWAY_TEST_SECRET=\n'));
+	assert.ok(!body.includes('checkout-test'));
+});
+
 test('runCredentials counts satisfied via the .env chain, not just ambient env', (t) => {
 	captureStderr(t);
 	const root = makeRoot(
