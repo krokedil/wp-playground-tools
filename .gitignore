@@ -3,3 +3,5 @@ node_modules/
 certs/
 *.log
 .DS_Store
+# Sandbox dogfooding secrets (NGROK_AUTHTOKEN, KROKEDIL_PG_TUNNEL_PASS, …).
+.env

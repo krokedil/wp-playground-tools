@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url';
 
 import { wpVersionFor } from '../config.mjs';
 import { copyRuntimeReadable } from '../runtime-file.mjs';
-import { pluginContainerPath } from './steps.mjs';
 import * as steps from './steps.mjs';
 
 /** Package-root assets directory (mu-plugins, default seed data). */
@@ -178,6 +177,9 @@ export function composeBlueprint(config, mode) {
 /** How long a cached wordpress.org plugin zip stays fresh. */
 const ZIP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Below this a "zip" is an error page or a truncated write, not a plugin. */
+const MIN_ZIP_BYTES = 1000;
+
 /**
  * Host-side download cache for wordpress.org zips (overridable for tests).
  *
@@ -201,6 +203,10 @@ function zipCacheDir() {
 async function fetchToFile(url, dest, attempts = 3) {
 	let lastError;
 	for (let i = 0; i < attempts; i++) {
+		if (i) {
+			// Transient blips (DNS, resets) outlive back-to-back retries.
+			await new Promise((r) => setTimeout(r, 500 * 2 ** (i - 1)));
+		}
 		try {
 			const res = await fetch(url, {
 				signal: AbortSignal.timeout(30000),
@@ -210,15 +216,18 @@ async function fetchToFile(url, dest, attempts = 3) {
 				throw new Error(`HTTP ${res.status}`);
 			}
 			const buffer = Buffer.from(await res.arrayBuffer());
-			if (buffer.length < 1000) {
+			if (buffer.length < MIN_ZIP_BYTES) {
 				throw new Error(
 					`suspiciously small download (${buffer.length} bytes)`
 				);
 			}
-			// Plain write: this is the host-side cache under ~/.config, not
-			// something the runtime reads — copyRuntimeReadable fixes the mode
-			// of the staged copy whatever this file ends up as.
-			fs.writeFileSync(dest, buffer);
+			// Write via a temp file + rename so an interrupted write can never
+			// leave a truncated zip that the freshness check later accepts.
+			// Plain permissions: this is the host-side cache under ~/.config,
+			// not something the runtime reads — copyRuntimeReadable fixes the
+			// mode of the staged copy whatever this file ends up as.
+			fs.writeFileSync(`${dest}.part`, buffer);
+			fs.renameSync(`${dest}.part`, dest);
 			return;
 		} catch (err) {
 			lastError = err;
@@ -256,9 +265,12 @@ async function stagePluginZips(root, config, blueprint) {
 	for (const step of installSteps) {
 		const slug = step.pluginData.slug;
 		const cached = path.join(cacheDir, `${slug}.zip`);
+		// Size floor mirrors fetchToFile: a cache entry from before writes were
+		// atomic may be truncated, and installing it fails undiagnosably.
 		const fresh =
 			fs.existsSync(cached) &&
-			Date.now() - fs.statSync(cached).mtimeMs < ZIP_TTL_MS;
+			Date.now() - fs.statSync(cached).mtimeMs < ZIP_TTL_MS &&
+			fs.statSync(cached).size >= MIN_ZIP_BYTES;
 		if (!fresh) {
 			try {
 				await fetchToFile(
@@ -275,7 +287,7 @@ async function stagePluginZips(root, config, blueprint) {
 		copyRuntimeReadable(cached, path.join(stagedDir, `${slug}.zip`));
 		step.pluginData = {
 			resource: 'vfs',
-			path: `${pluginContainerPath(config.slug)}/.playground/plugins/${slug}.zip`,
+			path: `${steps.pluginContainerPath(config.slug)}/.playground/plugins/${slug}.zip`,
 		};
 	}
 }
@@ -301,8 +313,9 @@ export async function composeAndStage(root, config, mode) {
 			? file.source
 			: path.join(root, file.source);
 		if (!fs.existsSync(source)) {
+			// No "playground:" prefix — the CLI's top-level handler adds it.
 			throw new Error(
-				`playground: mu-plugin not found: ${source} (check config.muPlugins).`
+				`mu-plugin not found: ${source} (check config.muPlugins).`
 			);
 		}
 		copyRuntimeReadable(source, path.join(muDir, file.name));
@@ -315,7 +328,7 @@ export async function composeAndStage(root, config, mode) {
 			: path.join(ASSETS_DIR, 'seed-data', 'default.json');
 		if (!fs.existsSync(seedSource)) {
 			throw new Error(
-				`playground: seed data not found: ${seedSource} (check config.seedData).`
+				`seed data not found: ${seedSource} (check config.seedData).`
 			);
 		}
 		copyRuntimeReadable(

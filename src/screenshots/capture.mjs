@@ -49,6 +49,23 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
+import { MODE_PORT_OFFSETS } from '../config.mjs';
+
+/**
+ * Parse a prune "keep newest N" env value, defending the rm -rf below: a
+ * non-numeric or non-positive value must fall back, never reach the prune —
+ * `NaN` passes the `length <= keep` guard and `slice(NaN)` selects the whole
+ * list for deletion.
+ *
+ * @param {string|undefined} raw      Raw env value.
+ * @param {number}           fallback Default when unset/invalid.
+ * @return {number} A positive integer.
+ */
+export function keepCount(raw, fallback) {
+	const n = Number(raw);
+	return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
 /**
  * Load Playwright's chromium — preferring the PLUGIN's @playwright/test (its
  * devDependency, whose browsers the developer installed) over any copy in
@@ -147,7 +164,7 @@ export async function capture(root, pluginConfig, argv) {
 		'host',
 		process.env.KROKEDIL_PG_SCREENSHOT_HOST || '127.0.0.1'
 	);
-	const demoPort = pluginConfig.basePort + 2;
+	const demoPort = pluginConfig.basePort + MODE_PORT_OFFSETS.demo;
 
 	// Resolve which port the demo Playground server is on. An explicit --port
 	// or the env always wins. Otherwise probe $PORT and demoPort..demoPort+3
@@ -194,7 +211,7 @@ export async function capture(root, pluginConfig, argv) {
 	const USER = process.env.KROKEDIL_PG_WP_USER || 'admin';
 	const PASS = process.env.KROKEDIL_PG_WP_PASS || 'password';
 	const VIEWPORT = config.viewport || { width: 1366, height: 900 };
-	const KEEP_COLLAGES = Number(process.env.KROKEDIL_PG_KEEP_COLLAGES || 30);
+	const KEEP_COLLAGES = keepCount(process.env.KROKEDIL_PG_KEEP_COLLAGES, 30);
 	const pageCache = new Map(); // block name → { id, link }, reused within a run
 
 	// Keep the newest `keep` entries (dirs or *.png files) under `dir`.
@@ -552,7 +569,7 @@ export async function capture(root, pluginConfig, argv) {
 		log(`⚠ ${failed} shot(s) failed`);
 		process.exitCode = 1;
 	}
-	const KEEP_SHOTS = Number(process.env.KROKEDIL_PG_KEEP_SHOTS || 6);
+	const KEEP_SHOTS = keepCount(process.env.KROKEDIL_PG_KEEP_SHOTS, 6);
 	await pruneOldest(WORK_ROOT, KEEP_SHOTS, 'dir');
 
 	if (!has('no-collage') && ok > 0) {

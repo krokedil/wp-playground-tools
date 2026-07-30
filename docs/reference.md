@@ -70,7 +70,8 @@ Env files are loaded before the config is evaluated, first value per name wins: 
 | `KROKEDIL_PG_SCREENSHOT_PORT` / `KROKEDIL_PG_SCREENSHOT_HOST` | where `screenshots` looks for the running site | probe from `basePort+2` / `127.0.0.1` |
 | `KROKEDIL_PG_WP_USER` / `KROKEDIL_PG_WP_PASS` | wp-admin login used by `screenshots` | `admin` / `password` |
 | `KROKEDIL_PG_TUNNEL_PASS` | password wp-login accepts for requests arriving over a `--tunnel` URL (the default `password` is refused there). Set it once for a login you already know on every playground | a random password, printed with the public URL |
-| `KROKEDIL_PG_KEEP_SHOTS` / `KROKEDIL_PG_KEEP_COLLAGES` | how many raw-shot dirs / collages to keep | 6 / 30 |
+| `KROKEDIL_PG_KEEP_SHOTS` / `KROKEDIL_PG_KEEP_COLLAGES` | how many raw-shot dirs / collages to keep (positive integers; anything else falls back) | 6 / 30 |
+| `KROKEDIL_PG_DEBUG` | print the full stack trace behind the `✖ playground:` error line | — |
 | `KROKEDIL_PG_CACHE_DIR` | override the plugin-zip download cache location | `~/.config/krokedil-playground/cache` |
 | `KROKEDIL_PG_REEXEC` | internal guard for the Node-version re-exec — don't set it | — |
 

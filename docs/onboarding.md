@@ -47,7 +47,7 @@ The generated config is a commented skeleton; the full schema lives in the [READ
 - **`options` / `pages`** — settings and pages your plugin needs on a fresh site, per mode (`all` merges under each).
 - **Secrets** (API keys, merchant IDs) never go in the config — read them from env vars via `envSecret()`. Locally the values live in the central `~/.config/krokedil-playground/.env` (shared by all plugins; a per-repo gitignored `.env` overrides it) — `pnpm exec krokedil-playground credentials` stubs the names your config reads into it. Also add the names to [`credentials.env.example`](../credentials.env.example) in this repo via PR, so the whole fleet's credentials stay discoverable in one place. See [README — Private options](../README.md#private-options-api-keys).
 
-A full-featured, real-world example (wpify-scoper markers, per-mode pages, custom seed data, screenshots, all four modes) is the returns-and-withdrawals fixture: [`tests/fixtures/rwwc.config.mjs`](../tests/fixtures/rwwc.config.mjs).
+A full-featured, real-world example (wpify-scoper markers, per-mode pages, custom seed data, screenshots, all four modes) is the returns-and-withdrawals fixture: [`tests/fixtures/rwwc.config.mjs` on GitHub](https://github.com/krokedil/wp-playground-tools/blob/main/tests/fixtures/rwwc.config.mjs) (`tests/` isn't shipped in the installed package, so the link points at the repo).
 
 ## 4. First boot
 
