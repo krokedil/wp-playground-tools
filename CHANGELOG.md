@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Docs: transport decision guide. The README's HTTPS section is now
+  "Transports" and opens with a which-transport-for-which-work table (plain
+  http for admin/backend work, `--https` for checkout/secure-context flows,
+  `--tunnel` only for inbound callbacks), stressing that the transport is a
+  per-run flag orthogonal to modes — even a payment plugin doesn't need the
+  tunnel all day. The same guidance landed in the scaffolded CLAUDE.md section
+  and docs/onboarding.md, and the config template gained the previously
+  undocumented `https: { hosts: […] }` example. Consumers pick it up with
+  `init --update`.
 - `--tunnel` runs now gate wp-admin behind a per-run password. A tunnel URL is
   reachable by anyone who has it, and the admin credentials are the documented
   Playground default — verified against a live ngrok tunnel, `admin` /
