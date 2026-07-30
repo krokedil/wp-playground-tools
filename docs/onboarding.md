@@ -64,8 +64,9 @@ Don't be alarmed by order notes saying `Email "…" failed to send: Could not in
 
 - **Seed data** — development mode seeds a generic SE WooCommerce fixture (products, tax, coupons, shipping, order templates). To seed plugin-specific data, point `seedData` at a JSON file in your repo; the shape is documented in [reference.md](reference.md#seed-data-json).
 - **PR screenshots** — set `screenshots: './tools/shots.config.mjs'`, add `@playwright/test` to the plugin's devDependencies, and run `pnpm exec playwright install chromium` once. Manifest shape in [reference.md](reference.md#screenshots-manifest).
+- **Transports** — plain http covers admin and most backend work; the two flags below are per-run additions, not a per-plugin commitment, so pick the cheapest one the task needs — even a payment plugin only needs `--tunnel` for inbound-callback work. Decision table in the [README](../README.md#transports-http---https---tunnel).
+- **`--https`** (local secure context — checkout flows, `is_ssl()`-dependent behavior) — `brew install mkcert && mkcert -install`.
 - **`--tunnel`** (public URL for payment-provider callbacks) — install the `ngrok` binary, set an authtoken (`NGROK_AUTHTOKEN` or `ngrok config add-authtoken`), reserve a domain for `tunnel.domain` under the company ngrok account, and claim it in the README's tunnel domain registry so callback registrations don't go stale. Details in the [README](../README.md#--tunnel-public-url--payment-provider-callbackswebhooks).
-- **`--https`** (local secure context) — `brew install mkcert && mkcert -install`.
 - **e2e mode** — add `'e2e'` to `modes`, then run `pnpm exec krokedil-playground init --update` to get the `playground:server-e2e` script and launch entry.
 
 ## 6. Keeping up to date
