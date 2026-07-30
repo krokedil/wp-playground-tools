@@ -447,6 +447,19 @@ test('scaffold stubs the config’s envSecret names into the central credentials
 	assert.match(central, /# KROKEDIL_PG_TUNNEL_PASS=/);
 });
 
+test('scaffold stubs nothing from the template’s commented examples', async (t) => {
+	const root = makePluginRoot(t);
+	await runScaffold(root, []);
+
+	// The scaffolded config's envSecret() example is commented out, so a fresh
+	// onboard must not push a placeholder into the file every plugin shares.
+	const central = fs.readFileSync(path.join(root, 'central.env'), 'utf8');
+	assert.ok(!central.includes('MY_TEST_SECRET'));
+	assert.ok(!central.includes('# --- my-payment-gateway ---'));
+	// The per-user tooling stubs are unconditional and still land.
+	assert.match(central, /# NGROK_AUTHTOKEN=/);
+});
+
 test('scaffold --update respects a custom basePort from the config', async (t) => {
 	const root = makePluginRoot(t);
 	await runScaffold(root, []);

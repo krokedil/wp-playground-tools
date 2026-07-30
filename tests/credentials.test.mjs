@@ -73,6 +73,34 @@ test('scanEnvSecretNames ignores imports and configs without envSecret', () => {
 	assert.equal(skipped, 0);
 });
 
+test('scanEnvSecretNames ignores calls inside line and block comments', () => {
+	// The scaffolded config's own example lives in a comment — stubbing it
+	// would put MY_TEST_SECRET in the shared central file on every onboard.
+	const { names, skipped } = scanEnvSecretNames(
+		"export default {\n\tslug: 'my-plugin',\n" +
+			"\t// options: { all: { s: envSecret('MY_TEST_SECRET') } },\n" +
+			'\t/* options: { all: {\n' +
+			"\t\ts: envSecret('BLOCK_SECRET'),\n" +
+			'\t} }, */\n' +
+			'};\n'
+	);
+	assert.deepEqual(names, []);
+	// Not even as unscannable calls — a comment is not configuration.
+	assert.equal(skipped, 0);
+});
+
+test('scanEnvSecretNames keeps code around comments and comment-like strings', () => {
+	const { names, skipped } = scanEnvSecretNames(
+		"const url = 'https://example.com/*'; // not a comment start\n" +
+			"const quoted = 'a // b /* c */ d';\n" +
+			"const kept = envSecret('REAL_NAME'); // envSecret('COMMENTED')\n" +
+			"const escaped = 'it\\'s // fine';\n" +
+			"const also = envSecret('SECOND_NAME');\n"
+	);
+	assert.deepEqual(names, ['REAL_NAME', 'SECOND_NAME']);
+	assert.equal(skipped, 0);
+});
+
 test('ensureCredentialStubs creates the file (and directory) with a heading', (t) => {
 	const root = makeRoot(t);
 	const file = path.join(root, 'deep', 'nested', '.env');

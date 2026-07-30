@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- The `envSecret()` scan behind `credentials` (and behind `init`) now strips
+  line and block comments before looking for names, so commented-out examples
+  no longer count as configuration. Every fresh onboard used to hit this: the
+  scaffolded config's commented `envSecret('MY_TEST_SECRET')` example was
+  scanned as a real call, so `init` reported it missing and appended a bogus
+  `MY_TEST_SECRET` stub — under that plugin's own heading — to
+  `~/.config/krokedil-playground/.env`, the file shared by every plugin
+  checkout, to be deleted by hand afterwards. The strip is a quote-aware walk,
+  so `'https://…'` and `// see 'X'` are each read the right way round.
+
 - Registry bookkeeping for onboarding qliro-for-woocommerce: `basePort` 8900
   claimed in the port registry, and the plugin's `QLIRO_TEST_API_KEY` /
   `QLIRO_TEST_API_SECRET` names documented in `credentials.env.example`.
