@@ -67,7 +67,7 @@ export default {
 	siteName: 'My Plugin',                   // default: title-cased slug
 	siteTagline: null,                       // default: "<Mode> by Krokedil"
 	landingPage: '/wp-admin/',               // development-mode landing page (demo/e2e always land on plugins.php)
-	basePort: 8910,                          // start; modes get +1/+2/+3 — see the port registry below
+	basePort: 8920,                          // start; modes get +1/+2/+3 — see the port registry below
 	php: '8.3',
 	wp: null,                                // string for all modes, or { development, demo, e2e }; default beta/latest/beta
 	composer: { markers: ['vendor/autoload.php'] },        // default when composer.json exists; add
@@ -189,7 +189,8 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 | 8880 | returns-and-withdrawals |
 | 8890 | klarna-payments-for-woocommerce |
 | 8900 | qliro-for-woocommerce |
-| 8910 | *(next plugin here)* |
+| 8910 | klarna-checkout-for-woocommerce |
+| 8920 | *(next plugin here)* |
 | 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
 
 8880 is also the tool's fallback when `basePort` is unset (returns-and-withdrawals claims it explicitly) — never rely on the fallback; the tool warns on every run until `basePort` is set.

@@ -14,6 +14,15 @@
   "unset basePort" warning never fired and the collision was silent. The test
   parses the registry table, so the next claim fails CI until both examples and
   the "next plugin here" row move together.
+- Registry bookkeeping for onboarding klarna-checkout-for-woocommerce: `basePort`
+  8910 claimed in the port registry, and the plugin's `KCO_TEST_MERCHANT_ID_EU` /
+  `KCO_TEST_SHARED_SECRET_EU` names documented in `credentials.env.example`. The
+  example `basePort` in the scaffolded config and the README schema block move to
+  8920, the registry's new free row.
+- The `credentials.env.example` blocks no longer assert that a gateway's "Test
+  mode" is on by default: this repo can't test another repo's runtime defaults,
+  so the claim could rot silently. Both the qliro and klarna-checkout entries now
+  just say the credentials are used when Test mode is on.
 
 ## 1.2.2 — 2026-07-30
 
