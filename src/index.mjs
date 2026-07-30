@@ -13,7 +13,12 @@ export {
 	normalizePerMode,
 	wpVersionFor,
 } from './config.mjs';
-export { applyEnvFile, envSecret } from './env.mjs';
+export { applyEnvFile, envSecret, globalEnvFile } from './env.mjs';
+export {
+	ensureCredentialStubs,
+	runCredentials,
+	scanEnvSecretNames,
+} from './credentials.mjs';
 export {
 	buildLaunchArgs,
 	buildModes,

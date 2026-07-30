@@ -36,11 +36,26 @@ function captureStderr(t) {
 	return () => mock.mock.calls.map((c) => String(c.arguments[0])).join('');
 }
 
+/**
+ * applyEnvFile with the central per-user file redirected to a missing path,
+ * so a real ~/.config/krokedil-playground/.env can never leak into a test.
+ *
+ * @param {string} root      Temp plugin root.
+ * @param {Object} [options] Forwarded to applyEnvFile (may override globalFile).
+ * @return {Object} applyEnvFile's result.
+ */
+function apply(root, options = {}) {
+	return applyEnvFile(root, {
+		globalFile: path.join(root, 'unused-global.env'),
+		...options,
+	});
+}
+
 test('applyEnvFile loads values without overriding ambient env', (t) => {
 	captureStderr(t);
 	const root = makeRoot(t, 'FRESH=from-file\nAMBIENT=from-file\nEMPTY=x\n');
 	const env = { AMBIENT: 'from-shell', EMPTY: '' };
-	const result = applyEnvFile(root, { env });
+	const result = apply(root, { env });
 
 	assert.equal(result.loaded, true);
 	assert.deepEqual(result.applied, ['FRESH']);
@@ -54,7 +69,7 @@ test('applyEnvFile loads values without overriding ambient env', (t) => {
 test('applyEnvFile is a silent no-op without a .env (the CI case)', (t) => {
 	const captured = captureStderr(t);
 	const env = {};
-	const result = applyEnvFile(makeRoot(t), { env });
+	const result = apply(makeRoot(t), { env });
 	assert.deepEqual(result, { loaded: false, applied: [] });
 	assert.deepEqual(env, {});
 	assert.equal(captured(), '');
@@ -69,7 +84,7 @@ test('applyEnvFile handles export prefixes, quotes and multi-line values', (t) =
 			'PEM="line one\nline two"\n'
 	);
 	const env = {};
-	applyEnvFile(root, { env });
+	apply(root, { env });
 	assert.equal(env.EXPORTED, 'yes');
 	assert.equal(env.QUOTED, 'hello world');
 	assert.equal(env.PEM, 'line one\nline two');
@@ -78,7 +93,7 @@ test('applyEnvFile handles export prefixes, quotes and multi-line values', (t) =
 test('applyEnvFile strips a leading BOM', (t) => {
 	captureStderr(t);
 	const env = {};
-	applyEnvFile(makeRoot(t, '\uFEFFFIRST=1\n'), { env });
+	apply(makeRoot(t, '\uFEFFFIRST=1\n'), { env });
 	assert.equal(env.FIRST, '1');
 });
 
@@ -93,7 +108,7 @@ test('applyEnvFile never echoes a malformed line', (t) => {
 		'OK=1\nsk_live_pasted_secret_no_equals\nSWALLOWED=2\n'
 	);
 	const env = {};
-	applyEnvFile(root, { env });
+	apply(root, { env });
 
 	assert.equal(env.OK, '1');
 	const output = captured();
@@ -117,7 +132,7 @@ test('applyEnvFile falls back to the main checkout .env from a linked worktree',
 	);
 
 	const env = {};
-	const result = applyEnvFile(worktree, { env });
+	const result = apply(worktree, { env });
 	// Untracked files never transfer into worktrees — the fallback is what
 	// makes a fresh worktree session boot configured.
 	assert.equal(env.ONLY_MAIN, 'main');
@@ -130,7 +145,7 @@ test('applyEnvFile ignores an unparseable .git file', (t) => {
 	const root = makeRoot(t, 'A=1\n');
 	fs.writeFileSync(path.join(root, '.git'), 'not a gitdir pointer\n');
 	const env = {};
-	const result = applyEnvFile(root, { env });
+	const result = apply(root, { env });
 	assert.equal(env.A, '1');
 	assert.deepEqual(result.applied, ['A']);
 });
@@ -139,14 +154,14 @@ test('applyEnvFile applies names shadowing Object.prototype members', (t) => {
 	captureStderr(t);
 	const env = {};
 	// `name in env` would see the inherited toString and silently skip it.
-	applyEnvFile(makeRoot(t, 'toString=shadowed\n'), { env });
+	apply(makeRoot(t, 'toString=shadowed\n'), { env });
 	assert.equal(env.toString, 'shadowed');
 });
 
 test('applyEnvFile rejects reserved names, naming them', (t) => {
 	const captured = captureStderr(t);
 	const env = {};
-	const result = applyEnvFile(makeRoot(t, 'prototype=evil\nSAFE=1\n'), {
+	const result = apply(makeRoot(t, 'prototype=evil\nSAFE=1\n'), {
 		env,
 	});
 	assert.equal(env.SAFE, '1');
@@ -160,10 +175,72 @@ test('applyEnvFile never pollutes the prototype via __proto__', (t) => {
 	const env = {};
 	// parseEnv drops __proto__ itself on some Node versions and surfaces it
 	// on others — either way it must not reach the prototype link.
-	applyEnvFile(makeRoot(t, '__proto__=evil\nSAFE=1\n'), { env });
+	apply(makeRoot(t, '__proto__=evil\nSAFE=1\n'), { env });
 	assert.equal(env.SAFE, '1');
 	assert.equal(Object.getPrototypeOf(env), Object.prototype);
 	assert.ok(!Object.hasOwn(env, '__proto__'));
+});
+
+test('applyEnvFile loads the central file when the plugin has no .env', (t) => {
+	const captured = captureStderr(t);
+	const root = makeRoot(t);
+	const globalFile = path.join(root, 'central', '.env');
+	fs.mkdirSync(path.dirname(globalFile));
+	fs.writeFileSync(globalFile, 'CENTRAL_ONLY=yes\n');
+
+	const env = {};
+	const result = apply(root, { env, globalFile });
+	assert.equal(result.loaded, true);
+	assert.deepEqual(result.applied, ['CENTRAL_ONLY']);
+	assert.equal(env.CENTRAL_ONLY, 'yes');
+	// The summary names the actual source, not a generic ".env".
+	assert.match(captured(), /loaded 1 value\(s\) from .*central/);
+});
+
+test('applyEnvFile lets the plugin .env and ambient env win over the central file', (t) => {
+	const captured = captureStderr(t);
+	const root = makeRoot(t, 'SHARED=from-repo\nREPO_ONLY=r\n');
+	const globalFile = path.join(root, 'central', '.env');
+	fs.mkdirSync(path.dirname(globalFile));
+	fs.writeFileSync(
+		globalFile,
+		'SHARED=from-central\nAMBIENT=from-central\nCENTRAL_ONLY=c\n'
+	);
+
+	const env = { AMBIENT: 'from-shell' };
+	const result = apply(root, { env, globalFile });
+	assert.equal(env.SHARED, 'from-repo');
+	assert.equal(env.AMBIENT, 'from-shell');
+	assert.equal(env.REPO_ONLY, 'r');
+	assert.equal(env.CENTRAL_ONLY, 'c');
+	assert.deepEqual(result.applied.sort(), [
+		'CENTRAL_ONLY',
+		'REPO_ONLY',
+		'SHARED',
+	]);
+	// One summary line per source file.
+	assert.match(captured(), /loaded 2 value\(s\) from \.env/);
+	assert.match(captured(), /loaded 1 value\(s\) from .*central/);
+});
+
+test('applyEnvFile prefers the main checkout .env over the central file', (t) => {
+	captureStderr(t);
+	const main = makeRoot(t, 'SHARED=from-main\n');
+	fs.mkdirSync(path.join(main, '.git', 'worktrees', 'wt'), {
+		recursive: true,
+	});
+	const worktree = makeRoot(t);
+	fs.writeFileSync(
+		path.join(worktree, '.git'),
+		`gitdir: ${path.join(main, '.git', 'worktrees', 'wt')}\n`
+	);
+	const globalFile = path.join(worktree, 'central', '.env');
+	fs.mkdirSync(path.dirname(globalFile));
+	fs.writeFileSync(globalFile, 'SHARED=from-central\n');
+
+	const env = {};
+	apply(worktree, { env, globalFile });
+	assert.equal(env.SHARED, 'from-main');
 });
 
 test('envSecret ignores inherited properties', (t) => {

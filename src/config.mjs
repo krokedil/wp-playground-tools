@@ -324,10 +324,13 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 /**
  * Load and normalize <root>/playground.config.mjs.
  *
- * @param {string} root Plugin root directory (absolute).
+ * @param {string} root                 Plugin root directory (absolute).
+ * @param {Object} [options]            Options.
+ * @param {string} [options.globalFile] Central env file (test injection —
+ *                                      forwarded to applyEnvFile).
  * @return {Promise<Object>} The normalized config.
  */
-export async function loadConfig(root) {
+export async function loadConfig(root, { globalFile } = {}) {
 	const file = path.join(root, CONFIG_FILENAME);
 	if (!fs.existsSync(file)) {
 		fail(
@@ -336,7 +339,8 @@ export async function loadConfig(root) {
 	}
 	// Private options: the config module reads secrets from process.env, so
 	// .env must be merged before the import evaluates it.
-	applyEnvFile(root);
+	// An undefined globalFile falls through to applyEnvFile's own default.
+	applyEnvFile(root, { globalFile });
 	// Cache-bust: the config may be rewritten between loads in one process
 	// (init --update, tests) and ESM caches modules by URL.
 	const mod = await import(

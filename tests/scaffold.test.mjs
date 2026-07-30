@@ -31,6 +31,20 @@ function makePluginRoot(t) {
 	return root;
 }
 
+/**
+ * scaffold() with the central credentials file redirected into the temp root,
+ * so tests never read or write the real ~/.config/krokedil-playground/.env.
+ *
+ * @param {string}   root Temp plugin root.
+ * @param {string[]} args CLI args after "init".
+ * @return {Promise<void>} Resolves when done.
+ */
+function runScaffold(root, args = []) {
+	return scaffold(root, args, {
+		credentials: { env: {}, globalFile: path.join(root, 'central.env') },
+	});
+}
+
 test('inferSlug prefers the main plugin file over the directory name', (t) => {
 	const root = makePluginRoot(t);
 	assert.equal(inferSlug(root), 'my-payment-gateway');
@@ -43,7 +57,7 @@ test('inferSlug prefers the main plugin file over the directory name', (t) => {
 test('scaffold writes shim, config, pins, scripts, launch entries and ignores', async (t) => {
 	const root = makePluginRoot(t);
 	fs.writeFileSync(path.join(root, '.kernlignore'), 'node_modules\n');
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	assert.ok(fs.existsSync(path.join(root, 'tools', 'playground.mjs')));
 	assert.match(
@@ -110,7 +124,7 @@ test('scaffold upserts the CLAUDE.md section without touching the rest', async (
 		path.join(root, 'CLAUDE.md'),
 		'# My Plugin\n\nHand-written notes.\n'
 	);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	let claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
 	assert.match(claude, /^# My Plugin\n\nHand-written notes\./);
@@ -118,7 +132,7 @@ test('scaffold upserts the CLAUDE.md section without touching the rest', async (
 
 	// A refresh replaces the section in place — no duplicates, notes intact.
 	fs.appendFileSync(path.join(root, 'CLAUDE.md'), '\nTrailing notes.\n');
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 	claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
 	assert.equal(claude.split(CLAUDE_MD_BEGIN).length, 2);
 	assert.match(claude, /Hand-written notes\./);
@@ -127,7 +141,7 @@ test('scaffold upserts the CLAUDE.md section without touching the rest', async (
 
 test('scaffold is idempotent and never overwrites the config', async (t) => {
 	const root = makePluginRoot(t);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	// The dev fills in their config…
 	const configPath = path.join(root, 'playground.config.mjs');
@@ -138,7 +152,7 @@ test('scaffold is idempotent and never overwrites the config', async (t) => {
 	launch.configurations.push({ name: 'storybook', port: 6006 });
 	fs.writeFileSync(launchPath, JSON.stringify(launch));
 
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 
 	assert.match(fs.readFileSync(configPath, 'utf8'), /slug: 'edited'/);
 	const after = JSON.parse(fs.readFileSync(launchPath, 'utf8'));
@@ -152,7 +166,7 @@ test('scaffold is idempotent and never overwrites the config', async (t) => {
 
 test('scaffold --update derives scripts and launch entries from config.modes', async (t) => {
 	const root = makePluginRoot(t);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	const pkgPath = path.join(root, 'package.json');
 	assert.equal(
@@ -166,7 +180,7 @@ test('scaffold --update derives scripts and launch entries from config.modes', a
 		path.join(root, 'playground.config.mjs'),
 		"export default { slug: 'my-payment-gateway', basePort: 8890, modes: ['start', 'development', 'demo', 'e2e'] };\n"
 	);
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 
 	const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 	assert.equal(
@@ -189,13 +203,13 @@ test('scaffold --update derives scripts and launch entries from config.modes', a
 test('scaffold --update prunes dropped-mode scripts but keeps customized ones', async (t) => {
 	const root = makePluginRoot(t);
 	const pkgPath = path.join(root, 'package.json');
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	fs.writeFileSync(
 		path.join(root, 'playground.config.mjs'),
 		"export default { slug: 'my-payment-gateway', basePort: 8890, modes: ['start', 'development', 'demo', 'e2e'] };\n"
 	);
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 
 	// The dev drops e2e again but has customized its script — it must survive.
 	fs.writeFileSync(
@@ -206,7 +220,7 @@ test('scaffold --update prunes dropped-mode scripts but keeps customized ones', 
 	pkg.scripts['playground:server-e2e'] = 'echo customized';
 	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
 
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 	pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 	assert.equal(pkg.scripts['playground:server-e2e'], 'echo customized');
 
@@ -215,7 +229,7 @@ test('scaffold --update prunes dropped-mode scripts but keeps customized ones', 
 		'node tools/playground.mjs server e2e';
 	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
 
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 	pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 	assert.equal(pkg.scripts['playground:server-e2e'], undefined);
 	const launch = JSON.parse(
@@ -229,7 +243,7 @@ test('scaffold --update prunes dropped-mode scripts but keeps customized ones', 
 
 test('fresh scaffold (no package.json) defaults to pnpm and declares it', async (t) => {
 	const root = makePluginRoot(t);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	const pkg = JSON.parse(
 		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
@@ -261,7 +275,7 @@ test('scaffold treats an undeclared package.json as npm (CI detection)', async (
 		path.join(root, 'package.json'),
 		JSON.stringify({ name: 'my-payment-gateway', version: '1.0.0' })
 	);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	const pkg = JSON.parse(
 		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
@@ -294,7 +308,7 @@ test('scaffold treats a yarn declaration as npm and preserves it', async (t) => 
 		path.join(root, 'package.json'),
 		JSON.stringify({ name: 'x', packageManager: 'yarn@4.0.0' })
 	);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	const pkg = JSON.parse(
 		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
@@ -318,7 +332,7 @@ test('scaffold keeps pnpm treatment for declared pnpm plugins without re-stampin
 			devEngines: { packageManager: { name: 'pnpm', version: '9' } },
 		})
 	);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	const pkg = JSON.parse(
 		fs.readFileSync(path.join(root, 'package.json'), 'utf8')
@@ -358,7 +372,7 @@ test('scaffold preserves existing JSON indentation, defaults to tabs', async (t)
 		) + '\n'
 	);
 
-	await scaffold(root, []);
+	await runScaffold(root, []);
 
 	const pkgBody = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
 	assert.match(pkgBody, /^ {2}"name"/m);
@@ -377,7 +391,7 @@ test('scaffold preserves existing JSON indentation, defaults to tabs', async (t)
 
 	// Without a pre-existing package.json the tab default applies.
 	const bare = makePluginRoot(t);
-	await scaffold(bare, []);
+	await runScaffold(bare, []);
 	assert.match(
 		fs.readFileSync(path.join(bare, 'package.json'), 'utf8'),
 		/^\t"name"/m
@@ -401,7 +415,7 @@ test('scaffold restores the #semver range pnpm add drops, keeps deliberate pins'
 			},
 		}) + '\n'
 	);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 	let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 	assert.equal(
 		pkg.devDependencies['@krokedil/wp-playground-tools'],
@@ -413,19 +427,34 @@ test('scaffold restores the #semver range pnpm add drops, keeps deliberate pins'
 	const pinned = 'github:krokedil/wp-playground-tools#main';
 	pkg.devDependencies['@krokedil/wp-playground-tools'] = pinned;
 	fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 	pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 	assert.equal(pkg.devDependencies['@krokedil/wp-playground-tools'], pinned);
 });
 
+test('scaffold stubs the config’s envSecret names into the central credentials file', async (t) => {
+	const root = makePluginRoot(t);
+	fs.writeFileSync(
+		path.join(root, 'playground.config.mjs'),
+		"export default {\n\tslug: 'my-payment-gateway',\n\tbasePort: 8890,\n" +
+			"\toptions: { all: { key: envSecret('GATEWAY_TEST_KEY') } },\n};\n"
+	);
+	await runScaffold(root, []);
+
+	const central = fs.readFileSync(path.join(root, 'central.env'), 'utf8');
+	assert.match(central, /# --- my-payment-gateway ---\n# GATEWAY_TEST_KEY=/);
+	assert.match(central, /# NGROK_AUTHTOKEN=/);
+	assert.match(central, /# KROKEDIL_PG_TUNNEL_PASS=/);
+});
+
 test('scaffold --update respects a custom basePort from the config', async (t) => {
 	const root = makePluginRoot(t);
-	await scaffold(root, []);
+	await runScaffold(root, []);
 	fs.writeFileSync(
 		path.join(root, 'playground.config.mjs'),
 		"export default { slug: 'my-payment-gateway', basePort: 8890 };\n"
 	);
-	await scaffold(root, ['--update']);
+	await runScaffold(root, ['--update']);
 	const launch = JSON.parse(
 		fs.readFileSync(path.join(root, '.claude', 'launch.json'), 'utf8')
 	);

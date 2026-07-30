@@ -23,7 +23,7 @@ import { clearProxyUrl, clearTunnelPassword } from './proxy/tunnel.mjs';
 /** The mu-plugin that gates logins while a tunnel is running. */
 const TUNNEL_GUARD = 'playground-tunnel-guard.php';
 
-const USAGE = `usage: krokedil-playground <start|server <mode>|setup|compose|screenshots|init> [flags…] — see --help\n`;
+const USAGE = `usage: krokedil-playground <start|server <mode>|setup|compose|screenshots|credentials|init> [flags…] — see --help\n`;
 
 const HELP = `krokedil-playground — WordPress Playground dev environments for Krokedil plugins
 
@@ -35,6 +35,8 @@ Commands:
   setup                        install prerequisites only
   compose [mode…]              write the generated blueprint(s) for inspection
   screenshots [args…]          run the PR screenshot capture
+  credentials                  scan the config for envSecret() names and stub
+                               missing ones in ~/.config/krokedil-playground/.env
   init [--update]              scaffold (or refresh) a plugin's playground setup
 
 Cross-cutting flags for start/server:
@@ -160,6 +162,11 @@ async function run(argv) {
 				);
 				log(`composed ${blueprintPath}`);
 			}
+			return;
+		}
+		case 'credentials': {
+			const { runCredentials } = await import('./credentials.mjs');
+			runCredentials(root);
 			return;
 		}
 		case 'setup':
