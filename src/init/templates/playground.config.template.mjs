@@ -48,7 +48,8 @@ export default {
 	// --tunnel-domain=<second-reserved-domain|none>.
 	// tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' },
 
-	// For --https: extra mkcert SANs when the site is reached via a hostname
-	// other than localhost. Defaults to ['localhost'].
+	// For --https: the mkcert SAN list. Replaces the default ['localhost'] —
+	// keep 'localhost' in the list if you still browse there; the first entry
+	// becomes the host in the printed https URL.
 	// https: { hosts: [ 'localhost', 'my-plugin.test' ] },
 };

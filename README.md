@@ -84,7 +84,7 @@ export default {
 	modes: ['start', 'development', 'demo'], // e2e is opt-in
 	screenshots: './tools/shots.config.mjs', // omit to disable the screenshots command
 	tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' }, // domain optional but recommended
-	https: { hosts: ['localhost'] },         // mkcert SANs for --https
+	https: { hosts: ['localhost'] },         // mkcert SANs for --https (replaces the default; first entry is the URL host)
 };
 ```
 
