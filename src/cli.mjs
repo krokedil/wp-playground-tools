@@ -2,22 +2,10 @@
 /**
  * krokedil-playground — CLI entry.
  *
- * Subcommands:
- *   start [flags…]              boot the persistent dev site (worktree-isolated)
- *   server <mode> [flags…]      ephemeral server: development | demo | e2e
- *   setup                       install prerequisites only
- *   compose [mode…]             write the generated blueprint(s) for inspection
- *   screenshots [args…]         run the PR screenshot capture
- *   init [--update]             scaffold (or refresh) a plugin's playground setup
- *
- * Cross-cutting flags for start/server:
- *   --fresh     reprovision the persistent site (start only)
- *   --tunnel    expose the site over https via ngrok (public URL, webhooks)
- *   --tunnel-domain=<host|none>  per-run tunnel domain override (implies
- *               --tunnel; 'none' forces an ephemeral URL — parallel worktrees)
- *   --https     serve https locally via mkcert + reverse proxy (no tunnel)
- * Everything else is forwarded to the Playground CLI (--xdebug, --php=…, …).
+ * Subcommands and cross-cutting flags are documented in HELP below (what
+ * `--help` prints); everything unrecognized is forwarded to the Playground CLI.
  */
+import fs from 'node:fs';
 import process from 'node:process';
 
 import { composeAndStage } from './blueprint/compose.mjs';
@@ -35,6 +23,33 @@ import { clearProxyUrl, clearTunnelPassword } from './proxy/tunnel.mjs';
 /** The mu-plugin that gates logins while a tunnel is running. */
 const TUNNEL_GUARD = 'playground-tunnel-guard.php';
 
+const USAGE = `usage: krokedil-playground <start|server <mode>|setup|compose|screenshots|init> [flags…] — see --help\n`;
+
+const HELP = `krokedil-playground — WordPress Playground dev environments for Krokedil plugins
+
+usage: krokedil-playground <command> [flags…]
+
+Commands:
+  start [flags…]               boot the persistent dev site (worktree-isolated)
+  server <mode> [flags…]       ephemeral server: development | demo | e2e
+  setup                        install prerequisites only
+  compose [mode…]              write the generated blueprint(s) for inspection
+  screenshots [args…]          run the PR screenshot capture
+  init [--update]              scaffold (or refresh) a plugin's playground setup
+
+Cross-cutting flags for start/server:
+  --fresh                      reprovision the persistent site (start only)
+  --tunnel                     expose the site over https via ngrok (public
+                               URL, webhooks)
+  --tunnel-domain=<host|none>  per-run tunnel domain override (implies
+                               --tunnel; 'none' forces an ephemeral URL —
+                               parallel worktrees)
+  --https                      serve https locally via mkcert + reverse proxy
+                               (no tunnel)
+
+Everything else is forwarded to the Playground CLI (--xdebug, --php=…, …).
+`;
+
 /**
  * Why a warm persistent site can't be tunnelled, if it can't.
  *
@@ -44,21 +59,31 @@ const TUNNEL_GUARD = 'playground-tunnel-guard.php';
  * password. Refuse instead, and say how to fix it. Blueprint modes (server
  * development|demo|e2e) apply a blueprint on every run, so they always have it.
  *
+ * Exported for tests; `facts` injects the two site-state probes so the
+ * decision is testable without a real ~/.wordpress-playground site.
+ *
  * @param {string}   root     Plugin root.
  * @param {Object}   config   Normalized plugin config.
  * @param {string}   modeName Mode about to launch.
  * @param {string[]} args     Args forwarded to launch().
+ * @param {Object}   [facts]  { isProvisioned, isMuPluginLinked } overrides.
  * @return {string|null} An error message, or null when the run is safe.
  */
-function tunnelGuardBlocker(root, config, modeName, args) {
+export function tunnelGuardBlocker(
+	root,
+	config,
+	modeName,
+	args,
+	facts = { isProvisioned, isMuPluginLinked }
+) {
 	const mode = buildModes(config)[modeName];
-	if (!mode?.persistent || !isProvisioned(root)) {
+	if (!mode?.persistent || !facts.isProvisioned(root)) {
 		return null;
 	}
 	if (decideBlueprint(mode.blueprint, args, true).provisioning) {
 		return null; // Reprovisioning links it.
 	}
-	if (isMuPluginLinked(root, TUNNEL_GUARD)) {
+	if (facts.isMuPluginLinked(root, TUNNEL_GUARD)) {
 		return null;
 	}
 	return (
@@ -77,6 +102,27 @@ function tunnelGuardBlocker(root, config, modeName, args) {
  *   commands resolve on child exit and set process.exitCode).
  */
 export async function main(argv = process.argv.slice(2)) {
+	try {
+		await run(argv);
+	} catch (err) {
+		// One place turns every thrown Error (config validation, staging,
+		// unknown blueprint mode, …) into the package's own error line instead
+		// of a raw stack trace. KROKEDIL_PG_DEBUG=1 keeps the stack.
+		process.stderr.write(`✖ playground: ${err.message}\n`);
+		if (process.env.KROKEDIL_PG_DEBUG) {
+			process.stderr.write(`${err.stack}\n`);
+		}
+		process.exitCode = 1;
+	}
+}
+
+/**
+ * Dispatch a CLI invocation (throws on failure; main() owns error display).
+ *
+ * @param {string[]} argv Arguments after the bin name.
+ * @return {Promise<void>} Resolves when the command completes.
+ */
+async function run(argv) {
 	const [command, ...rest] = argv;
 	const root = process.cwd();
 
@@ -94,9 +140,18 @@ export async function main(argv = process.argv.slice(2)) {
 		}
 		case 'compose': {
 			const config = await loadConfig(root);
+			// No explicit modes: compose every blueprint the plugin uses.
+			// `start` boots the development blueprint, so a modes: ['start']
+			// plugin composes that instead of silently doing nothing.
 			const modes = rest.length
 				? rest
-				: config.modes.filter((m) => m !== 'start');
+				: [
+						...new Set(
+							config.modes.map((m) =>
+								m === 'start' ? 'development' : m
+							)
+						),
+					];
 			for (const mode of modes) {
 				const { blueprintPath } = await composeAndStage(
 					root,
@@ -114,13 +169,35 @@ export async function main(argv = process.argv.slice(2)) {
 		}
 		case 'server': {
 			const [mode, ...args] = rest;
-			await runMode(root, mode, args);
+			const config = await loadConfig(root);
+			// Validate here: launch()'s mode table also holds setup/start,
+			// which are not `server` modes and must not be suggested.
+			const serverModes = config.modes.filter((m) => m !== 'start');
+			if (!mode || !serverModes.includes(mode)) {
+				throw new Error(
+					`server needs a mode: ${serverModes.join(' | ')}` +
+						(mode ? ` — got "${mode}".` : `.`)
+				);
+			}
+			await runMode(root, mode, args, config);
+			return;
+		}
+		case '--help':
+		case '-h':
+			process.stdout.write(HELP);
+			return;
+		case '--version': {
+			const pkg = JSON.parse(
+				fs.readFileSync(
+					new URL('../package.json', import.meta.url),
+					'utf8'
+				)
+			);
+			process.stdout.write(`${pkg.version}\n`);
 			return;
 		}
 		default:
-			process.stderr.write(
-				`usage: krokedil-playground <start|server <mode>|setup|compose|screenshots|init> [flags…]\n`
-			);
+			process.stderr.write(USAGE);
 			process.exitCode = command ? 1 : 0;
 	}
 }
@@ -132,8 +209,10 @@ export async function main(argv = process.argv.slice(2)) {
  * @param {string}   root     Plugin root.
  * @param {string}   modeName Mode to launch.
  * @param {string[]} args     User args (ours + forwarded).
+ * @param {Object}   [cfg]    Pre-loaded config (the server case validates
+ *                            against it before dispatching here).
  */
-async function runMode(root, modeName, args) {
+async function runMode(root, modeName, args, cfg = null) {
 	// --tunnel-domain=<host|none> overrides config.tunnel.domain for this run
 	// (parallel worktrees share the committed config) and implies --tunnel.
 	const domainArg = args.find((a) => a.startsWith('--tunnel-domain='));
@@ -143,20 +222,12 @@ async function runMode(root, modeName, args) {
 	const wantsTunnel = args.includes('--tunnel') || tunnelDomain !== null;
 	const wantsHttps = args.includes('--https');
 	if (wantsTunnel && wantsHttps) {
-		process.stderr.write(
-			'✖ playground: --tunnel and --https are mutually exclusive (one public URL per site).\n'
+		throw new Error(
+			'--tunnel and --https are mutually exclusive (one public URL per site).'
 		);
-		process.exitCode = 1;
-		return;
 	}
 	if (tunnelDomain !== null && tunnelDomain !== 'none') {
-		try {
-			validateTunnelDomain(tunnelDomain, '--tunnel-domain');
-		} catch (err) {
-			process.stderr.write(`✖ playground: ${err.message}\n`);
-			process.exitCode = 1;
-			return;
-		}
+		validateTunnelDomain(tunnelDomain, '--tunnel-domain');
 	}
 	const forwarded = args.filter(
 		(a) =>
@@ -165,7 +236,7 @@ async function runMode(root, modeName, args) {
 			!a.startsWith('--tunnel-domain=')
 	);
 
-	const config = await loadConfig(root);
+	const config = cfg ?? (await loadConfig(root));
 
 	// Stale files from a crashed proxied run would silently point the site at a
 	// dead URL, or demand a password nobody has any more — always start clean.
@@ -175,15 +246,21 @@ async function runMode(root, modeName, args) {
 	if (wantsTunnel) {
 		const blocker = tunnelGuardBlocker(root, config, modeName, forwarded);
 		if (blocker) {
-			process.stderr.write(`✖ playground: ${blocker}\n`);
-			process.exitCode = 1;
-			return;
+			throw new Error(blocker);
 		}
 	}
 
 	const handle = await launch(root, config, modeName, forwarded);
 	if (!handle) {
 		return; // setup-only
+	}
+
+	// Mirror Ctrl+C into the child; cleanup runs when the child exits. Wired
+	// before the proxy starts: ngrok/mkcert startup takes up to ~20s, and a
+	// Ctrl+C in that window must not kill us with the child (and possibly a
+	// live ngrok agent holding the reserved domain) still running.
+	for (const signal of ['SIGINT', 'SIGTERM']) {
+		process.on(signal, () => handle.child.kill(signal));
 	}
 
 	let proxy = null;
@@ -212,11 +289,6 @@ async function runMode(root, modeName, args) {
 			process.exitCode = 1;
 			return;
 		}
-	}
-
-	// Mirror Ctrl+C into the child; cleanup runs when the child exits.
-	for (const signal of ['SIGINT', 'SIGTERM']) {
-		process.on(signal, () => handle.child.kill(signal));
 	}
 
 	const exitCode = await handle.done;

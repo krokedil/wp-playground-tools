@@ -185,6 +185,98 @@ test('loadConfig warns on a defaulted basePort, silent when set', async (t) => {
 	assert.ok(!write.mock.calls.some((c) => /basePort/.test(c.arguments[0])));
 });
 
+test('composer requires markers when set (null disables it)', () => {
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', composer: {} }),
+		/composer\.markers/
+	);
+	const config = normalizeConfig(
+		{ slug: 'a-plugin', composer: null },
+		{ hasComposerJson: true }
+	);
+	assert.equal(config.composer, null);
+});
+
+test('modes must be a non-empty array of strings', () => {
+	for (const bad of ['start', [], [42], {}]) {
+		assert.throws(
+			() => normalizeConfig({ slug: 'a-plugin', modes: bad }),
+			/"modes" must be a non-empty array/,
+			`expected rejection for ${JSON.stringify(bad)}`
+		);
+	}
+});
+
+test('activate must be an array of strings', () => {
+	for (const bad of ['my-plugin', [42], { all: [] }]) {
+		assert.throws(
+			() => normalizeConfig({ slug: 'a-plugin', activate: bad }),
+			/"activate" must be an array/,
+			`expected rejection for ${JSON.stringify(bad)}`
+		);
+	}
+});
+
+test('php and wp must be version strings', () => {
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', php: 8.3 }),
+		/"php" must be a version string/
+	);
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', wp: 6.7 }),
+		/"wp" must be a version string/
+	);
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', wp: { development: 6.7 } }),
+		/"wp" must be a version string/
+	);
+	const config = normalizeConfig({
+		slug: 'a-plugin',
+		php: '8.2',
+		wp: { development: 'beta' },
+	});
+	assert.equal(config.php, '8.2');
+	assert.equal(config.wp.development, 'beta');
+});
+
+test('screenshots must be a path string', () => {
+	assert.throws(
+		() => normalizeConfig({ slug: 'a-plugin', screenshots: 42 }),
+		/"screenshots" must be a path string/
+	);
+});
+
+test('https.hosts must be a non-empty string array', () => {
+	for (const bad of ['localhost', [], [42]]) {
+		assert.throws(
+			() => normalizeConfig({ slug: 'a-plugin', https: { hosts: bad } }),
+			/"https\.hosts" must be a non-empty array/,
+			`expected rejection for ${JSON.stringify(bad)}`
+		);
+	}
+	const config = normalizeConfig({
+		slug: 'a-plugin',
+		https: { hosts: ['app.localhost'] },
+	});
+	assert.deepEqual(config.https.hosts, ['app.localhost']);
+});
+
+test('pages entries need string title, slug and content', () => {
+	assert.throws(
+		() =>
+			normalizeConfig({
+				slug: 'a-plugin',
+				pages: [{ title: 'Checkout Test', slug: 'checkout-test' }],
+			}),
+		/"pages" entries need string/
+	);
+	const config = normalizeConfig({
+		slug: 'a-plugin',
+		pages: [{ title: 'T', slug: 't', content: '<!-- wp:paragraph -->' }],
+	});
+	assert.equal(config.pages.development.length, 1);
+});
+
 test('store overrides merge over org defaults', () => {
 	const config = normalizeConfig({
 		slug: 'a-plugin',

@@ -27,15 +27,15 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { composeAndStage } from './blueprint/compose.mjs';
-import { MODE_PORT_OFFSETS } from './config.mjs';
+import { BLUEPRINT_MODES, MODE_PORT_OFFSETS } from './config.mjs';
 import { PM_COMMANDS, detectPackageManager, execpathMatches } from './pm.mjs';
 import { resolvePort } from './port.mjs';
 
 /** Directory (relative to the plugin root) for generated blueprints/assets. */
-export const STAGING_DIR = '.playground';
+const STAGING_DIR = '.playground';
 
 // Human-readable line for each blueprint decision (see decideBlueprint).
-export const REASON_MESSAGES = {
+const REASON_MESSAGES = {
 	'first-run':
 		'first run for this worktree → provisioning with the development blueprint (--reset)…',
 	reprovision:
@@ -96,7 +96,7 @@ export function buildModes(config) {
 			persistent: true,
 		};
 	}
-	for (const mode of ['development', 'demo', 'e2e']) {
+	for (const mode of BLUEPRINT_MODES) {
 		if (!config.modes.includes(mode)) {
 			continue;
 		}
@@ -176,7 +176,12 @@ export function resolvePlaygroundBin() {
 	const pkgPath = require.resolve('@wp-playground/cli/package.json');
 	const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 	const bin =
-		typeof pkg.bin === 'string' ? pkg.bin : Object.values(pkg.bin)[0];
+		typeof pkg.bin === 'string' ? pkg.bin : Object.values(pkg.bin ?? {})[0];
+	if (typeof bin !== 'string') {
+		throw new Error(
+			`@wp-playground/cli ${pkg.version ?? ''} has no usable "bin" entry in its package.json — its layout changed; this package's pin needs updating.`
+		);
+	}
 	return path.join(path.dirname(pkgPath), bin);
 }
 
@@ -251,11 +256,15 @@ export function ensureNodeForProvisioning(root) {
  * @return {string} Absolute path (may not exist yet).
  */
 function siteDir(root) {
+	// Key on `root` (process.cwd()), not $PWD: the Playground CLI hashes its
+	// own process.cwd(), and $PWD keeps symlinks / can be stale, so the two
+	// would disagree and we'd inspect a different site than the one the CLI
+	// boots — declaring a warm site "first run" resets it.
 	return path.join(
 		os.homedir(),
 		'.wordpress-playground',
 		'sites',
-		computeSiteHash(process.env.PWD || root)
+		computeSiteHash(root)
 	);
 }
 
