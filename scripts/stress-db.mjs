@@ -30,6 +30,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { loadConfig, MODE_PORT_OFFSETS } from '../src/config.mjs';
+import { findFreePort } from '../src/port.mjs';
 import { computeSiteHash } from '../src/prepare.mjs';
 
 const ROOT = process.cwd();
@@ -39,7 +40,12 @@ const BURST_SECONDS = Number(process.argv[3] ?? 45);
 const HAMMER_WORKERS = 12;
 
 const config = await loadConfig(ROOT);
-const base = `http://127.0.0.1:${config.basePort + MODE_PORT_OFFSETS.start}`;
+// Pin the port and pass it to the CLI explicitly: without --port the CLI
+// probes upward when the mode port is busy and would bind somewhere this
+// script isn't probing — every iteration would then be a false "never became
+// ready". Resolved once so all iterations hit the same port.
+const port = await findFreePort(config.basePort + MODE_PORT_OFFSETS.start);
+const base = `http://127.0.0.1:${port}`;
 const db = path.join(
 	os.homedir(),
 	'.wordpress-playground',
@@ -113,15 +119,29 @@ for (let i = 1; i <= ITERATIONS; i++) {
 	const { default: spawn } = await import('cross-spawn');
 	const child = spawn(
 		process.execPath,
-		[CLI, 'start', '--fresh'],
+		[CLI, 'start', '--fresh', `--port=${port}`],
 		// Keep the CLI's output out of the report; boot failures surface via
 		// the readiness probe below.
 		{ cwd: ROOT, stdio: 'ignore' }
 	);
-	const exited = new Promise((resolve) => child.on('exit', resolve));
+	// Resolve on error too (same pattern as prepare.mjs's launch): a spawn
+	// failure emits 'error' without 'exit', and awaiting exit alone would
+	// hang the harness forever.
+	const exited = new Promise((resolve) => {
+		child.on('exit', resolve);
+		child.on('error', (err) => {
+			process.stdout.write(`!! failed to spawn the CLI: ${err}\n`);
+			resolve(1);
+		});
+	});
+
+	let dead = false;
+	exited.then(() => {
+		dead = true;
+	});
 
 	let ready = false;
-	for (let t = 0; t < 120 && !ready; t++) {
+	for (let t = 0; t < 120 && !ready && !dead; t++) {
 		await new Promise((r) => setTimeout(r, 3000));
 		ready = (await get(`${base}/wp-json`)) === 200;
 	}
