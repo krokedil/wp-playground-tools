@@ -5,10 +5,11 @@ on:
     branches: [ main ]
   pull_request:
 
-# A new push to the same PR (or to main) supersedes the running build.
+# A new push to the same PR supersedes the running build; main pushes queue
+# instead so every merge commit keeps its green check.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
