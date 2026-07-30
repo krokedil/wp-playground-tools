@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.2 — 2026-07-30
 
 - Generated blueprints now disable WordPress's background automatic updater
   (`AUTOMATIC_UPDATER_DISABLED`, written into the site's `wp-config.php` so

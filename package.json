@@ -1,6 +1,6 @@
 {
 	"name": "@krokedil/wp-playground-tools",
-	"version": "1.2.1",
+	"version": "1.2.2",
 	"description": "Shared WordPress Playground dev tooling for Krokedil WooCommerce plugins: one-command bootstrap, worktree-isolated sites, generated blueprints, WC seeding, PR screenshots, and HTTPS via ngrok tunnel or local proxy.",
 	"type": "module",
 	"license": "GPL-3.0-or-later",
