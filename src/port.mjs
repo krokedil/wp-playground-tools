@@ -1,8 +1,7 @@
 /**
  * Cross-platform port resolver for the playground launch commands.
  *
- * Resolves a port, appends "--port=<resolved>" to the command (unless the
- * command already carries --port), and runs it. Resolution precedence:
+ * Resolves the port a launch should use. Resolution precedence:
  *
  *   1. An explicit --port in the forwarded command -> used verbatim (manual override).
  *   2. The PORT environment variable               -> used verbatim, no probing.
@@ -17,15 +16,8 @@
  * POSIX shell parameter-expansion, so it only works in sh/bash and breaks on
  * Windows (cmd.exe passes the literal "${PORT:-8880}"). Reading process.env in
  * Node behaves identically on Windows, macOS and Linux.
- *
- * Uses cross-spawn (argv array, no shell) rather than spawn(..., { shell: true }):
- * shell:true does not escape array args (injection surface) and is deprecated in
- * Node 22 (DEP0190), and spawning "npx.cmd" with shell:false throws EINVAL on
- * Node >=20.12 (CVE-2024-27980). cross-spawn resolves .cmd shims on Windows and
- * escapes args, so it is the portable, safe option.
  */
 import net from 'node:net';
-import os from 'node:os';
 
 const PORT_PROBE_ATTEMPTS = 20;
 
@@ -105,44 +97,4 @@ export async function resolvePort(defaultPort, args, env = process.env) {
 		);
 	}
 	return port;
-}
-
-/**
- * Resolve a port, inject --port=<n> into `args`, and spawn `command`.
- *
- * @param {number}   defaultPort Port to probe from when nothing pins one.
- * @param {string}   command     Executable to spawn.
- * @param {string[]} args        Arguments for the command.
- * @param {Object}   [options]   Extra child_process options (env, cwd, ...).
- * @return {Promise<{port: number|null, exitCode: number}>} The resolved port
- *   (null when the caller carried --port) and the child's mapped exit code —
- *   signal terminations map to the conventional 128+signum, so interrupted
- *   runs are not reported as success.
- */
-export async function runWithFreePort(
-	defaultPort,
-	command,
-	args,
-	options = {}
-) {
-	const port = await resolvePort(
-		defaultPort,
-		args,
-		options.env ?? process.env
-	);
-	const finalArgs = port !== null ? [...args, `--port=${port}`] : args;
-
-	const { default: spawn } = await import('cross-spawn');
-	const child = spawn(command, finalArgs, { stdio: 'inherit', ...options });
-
-	const exitCode = await new Promise((resolve, reject) => {
-		child.on('exit', (code, signal) => {
-			resolve(
-				signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 0)
-			);
-		});
-		child.on('error', reject);
-	});
-
-	return { port, exitCode };
 }

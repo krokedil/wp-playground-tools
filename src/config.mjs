@@ -98,6 +98,14 @@ export function normalizePerMode(value, name, kind) {
 		return Object.fromEntries(BLUEPRINT_MODES.map((m) => [m, value]));
 	}
 
+	// A primitive would fall through the key checks below as an object with no
+	// keys and silently normalize to empty per-mode values.
+	if (typeof value !== 'object') {
+		fail(
+			`"${name}" must be ${kind === 'array' ? 'an array or a per-mode object' : 'an object'}, got ${JSON.stringify(value)}.`
+		);
+	}
+
 	const allowedKeys = ['all', ...BLUEPRINT_MODES];
 	const unknown = Object.keys(value).filter((k) => !allowedKeys.includes(k));
 	if (unknown.length) {
@@ -159,6 +167,15 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 	}
 
 	const modes = raw.modes ?? ['start', 'development', 'demo'];
+	if (
+		!Array.isArray(modes) ||
+		!modes.length ||
+		modes.some((m) => typeof m !== 'string')
+	) {
+		fail(
+			`"modes" must be a non-empty array of mode names (${KNOWN_MODES.join(', ')}).`
+		);
+	}
 	const unknownModes = modes.filter((m) => !KNOWN_MODES.includes(m));
 	if (unknownModes.length) {
 		fail(
@@ -177,6 +194,62 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 		);
 	}
 
+	if (raw.composer && !raw.composer.markers?.length) {
+		fail(
+			'"composer.markers" must list at least one install marker when "composer" is set (set "composer: null" for plugins without composer).'
+		);
+	}
+
+	if (raw.php !== undefined && typeof raw.php !== 'string') {
+		fail(
+			`"php" must be a version string like '8.3' (quote it — a bare number lands verbatim in the blueprint), got ${JSON.stringify(raw.php)}.`
+		);
+	}
+	if (raw.wp !== undefined && raw.wp !== null) {
+		let wpValues = null;
+		if (typeof raw.wp === 'string') {
+			wpValues = [raw.wp];
+		} else if (typeof raw.wp === 'object' && !Array.isArray(raw.wp)) {
+			wpValues = Object.values(raw.wp);
+		}
+		if (!wpValues || wpValues.some((v) => typeof v !== 'string')) {
+			fail(
+				'"wp" must be a version string or a per-mode map of version strings (e.g. { development: \'beta\' }).'
+			);
+		}
+	}
+
+	if (
+		raw.activate !== undefined &&
+		(!Array.isArray(raw.activate) ||
+			raw.activate.some((s) => typeof s !== 'string'))
+	) {
+		fail(
+			'"activate" must be an array of plugin slugs/paths (defaults to [slug] when omitted).'
+		);
+	}
+
+	if (
+		raw.screenshots !== undefined &&
+		raw.screenshots !== null &&
+		typeof raw.screenshots !== 'string'
+	) {
+		fail(
+			'"screenshots" must be a path string to a shots manifest (e.g. \'./tools/shots.config.mjs\').'
+		);
+	}
+
+	if (
+		raw.https?.hosts !== undefined &&
+		(!Array.isArray(raw.https.hosts) ||
+			!raw.https.hosts.length ||
+			raw.https.hosts.some((h) => typeof h !== 'string'))
+	) {
+		// A bare string would spread character-by-character into the mkcert
+		// SAN list; an empty array would issue a certificate for no hostname.
+		fail('"https.hosts" must be a non-empty array of hostnames.');
+	}
+
 	if (raw.tunnel && raw.tunnel.provider && raw.tunnel.provider !== 'ngrok') {
 		fail(
 			`unsupported tunnel provider "${raw.tunnel.provider}" — only "ngrok" is available today.`
@@ -192,6 +265,31 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 
 	const activate = raw.activate ?? [raw.slug];
 
+	// `in`-check, not ??: an explicit `composer: null` opts out of composer
+	// install even when a composer.json exists.
+	let composer = null;
+	if ('composer' in raw) {
+		composer = raw.composer;
+	} else if (hasComposerJson) {
+		composer = { markers: ['vendor/autoload.php'] };
+	}
+
+	const pages = normalizePerMode(raw.pages, 'pages', 'array');
+	for (const list of Object.values(pages)) {
+		for (const page of list) {
+			if (
+				!page ||
+				typeof page.title !== 'string' ||
+				typeof page.slug !== 'string' ||
+				typeof page.content !== 'string'
+			) {
+				fail(
+					`"pages" entries need string "title", "slug" and "content", got ${JSON.stringify(page)}.`
+				);
+			}
+		}
+	}
+
 	return {
 		slug: raw.slug,
 		siteName: raw.siteName ?? titleCaseSlug(raw.slug),
@@ -200,9 +298,7 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 		basePort,
 		php: raw.php ?? '8.3',
 		wp: raw.wp ?? null, // null -> per-mode defaults (see wpVersionFor)
-		composer:
-			raw.composer ??
-			(hasComposerJson ? { markers: ['vendor/autoload.php'] } : null),
+		composer,
 		build: raw.build ?? null,
 		woocommerce: raw.woocommerce ?? true,
 		store: {
@@ -213,7 +309,7 @@ export function normalizeConfig(raw, { hasComposerJson = false } = {}) {
 		},
 		activate,
 		options: normalizePerMode(raw.options, 'options', 'object'),
-		pages: normalizePerMode(raw.pages, 'pages', 'array'),
+		pages,
 		muPlugins: normalizePerMode(raw.muPlugins, 'muPlugins', 'array'),
 		seedData: raw.seedData ?? null, // development-mode fixture; null -> package default
 		demoFixture: raw.demoFixture ?? raw.woocommerce ?? true,

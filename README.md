@@ -65,7 +65,7 @@ export default {
 	slug: 'my-plugin',                       // REQUIRED. Mount + all container paths derive from it.
 	siteName: 'My Plugin',                   // default: title-cased slug
 	siteTagline: null,                       // default: "<Mode> by Krokedil"
-	landingPage: '/wp-admin/',               // development-mode landing page
+	landingPage: '/wp-admin/',               // development-mode landing page (demo/e2e always land on plugins.php)
 	basePort: 8880,                          // start; modes get +1/+2/+3 — see the port registry below
 	php: '8.3',
 	wp: null,                                // string for all modes, or { development, demo, e2e }; default beta/latest/beta
@@ -141,6 +141,8 @@ The transport is a **per-run flag, not per-plugin config**: the same plugin — 
 
 Both proxy flags share one mechanism: the tool writes the public URL to `.playground/proxy-url.txt` and the always-staged `playground-proxy-url.php` mu-plugin filters `home`/`siteurl` to it at runtime (no DB writes — warm boots and later proxy-less boots are untouched; the file is removed on exit and defensively on every non-proxied launch). `is_ssl()` is true behind the proxy, so cookies, assets and mixed content behave — and switching transport between runs leaves no residue in the site.
 
+One proxied run per worktree at a time: **every** launch clears `proxy-url.txt` (and the tunnel password) for that worktree, so starting a second mode while a `--tunnel`/`--https` run is live snaps the first site's URLs back to localhost and, for tunnels, locks its wp-admin (the guard fails closed, never open). Use a second worktree for that.
+
 ### `--tunnel` (public URL — payment-provider callbacks/webhooks)
 
 ```sh
@@ -196,7 +198,7 @@ Reserve tunnel domains under the company ngrok pay-as-you-go account (dashboard.
 
 | tunnel.domain | Plugin |
 |---|---|
-| *(first domain here)* | |
+| *(none reserved yet — claim the first row when you reserve a domain)* | |
 
 ## Logs / database
 

@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 /** Offset from the playground port for the https listener. */
-export const HTTPS_PORT_OFFSET = 400;
+const HTTPS_PORT_OFFSET = 400;
 
 /**
  * Certificate cache directory.
@@ -34,7 +34,7 @@ function certDir() {
  * @param {string[]} hosts SANs (e.g. ['localhost']).
  * @return {{ cert: string, key: string }} PEM file paths.
  */
-export function ensureCert(hosts) {
+function ensureCert(hosts) {
 	const probe = spawnSync('mkcert', ['-CAROOT'], { encoding: 'utf8' });
 	if (probe.error || probe.status !== 0) {
 		throw new Error(

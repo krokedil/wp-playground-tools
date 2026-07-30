@@ -25,11 +25,6 @@ export {
 	nodeSatisfiesPin,
 	resolvePlaygroundBin,
 } from './prepare.mjs';
-export {
-	findFreePort,
-	isPortFree,
-	resolvePort,
-	runWithFreePort,
-} from './port.mjs';
+export { findFreePort, isPortFree, resolvePort } from './port.mjs';
 export { composeAndStage, composeBlueprint } from './blueprint/compose.mjs';
 export * as blueprintSteps from './blueprint/steps.mjs';

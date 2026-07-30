@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+**Upgrade notes** — `#semver:^1` consumers get all of this on a plain `pnpm update`:
+
+- `--tunnel` on a warm persistent site provisioned before the tunnel admin
+  guard existed now **refuses to launch** and asks for one `--fresh` run —
+  which resets that worktree's site data. Plan the reprovision before you need
+  the tunnel.
+- npm-based plugins stamped by an older `init` must hand-delete the stamped
+  `packageManager` + `engines.pnpm` from `package.json` (see
+  `docs/onboarding.md`), then run `init --update` to pick up the new shim.
+
 - Repo-internal workflow polish (nothing consumer-visible): opened PRs get an
   automatic Copilot review request, CI runs superseded by a newer push to the
   same PR are cancelled, a PR template reminds about the changelog convention,
@@ -87,7 +97,11 @@
   composer's expected git-clone fallback, not failures, and
   `composer config -g github-oauth.github.com <token>` silences them.
   (Observed onboarding klarna-payments-for-woocommerce.)
-
+- Docs: new "Emails never send" section — Playground's PHP-in-WASM has no mail
+  transport, so every `wp_mail()` fails (on WooCommerce sites as order notes
+  like `Email "Processing order" failed to send`); that's the platform, not
+  the plugin under development. The development blueprint pre-activates WP
+  Mail Logging, which records every attempted email under Tools → Email Log.
 - Bump `@wp-playground/cli` 3.1.29 → 3.1.47: upstream fixed the `--reset`
   crash on Node 22+ ([wordpress-playground#3695](https://github.com/WordPress/wordpress-playground/pull/3695),
   shipped in 3.1.36), so the Node `<21` ceiling is gone.
@@ -110,8 +124,10 @@
   so 1.48+ is fully supported. (Observed in klarna-payments-for-woocommerce.)
 - Fix: `init` rewrote the consumer's whole `package.json` (and a pre-existing
   `.claude/launch.json`) with tab indentation; the existing indentation is now
-  detected and preserved (tabs remain the default for new files). (Observed
-  onboarding klarna-payments-for-woocommerce.)
+  detected and preserved (tabs remain the default for new files). `init` also
+  fails loudly on an existing-but-empty `package.json`/`launch.json` instead
+  of dying in `JSON.parse`. (Observed onboarding
+  klarna-payments-for-woocommerce.)
 - Package-manager detection, mirroring Krokedil CI: the Node manager is read
   from package.json's `packageManager` (fallback `devEngines.packageManager`,
   string or object form) — pnpm iff declared, npm otherwise; lockfile presence
@@ -135,6 +151,47 @@
 - Provisioning on too-old Node (< 20.19) only attempts the `pnpm exec node`
   repin for pnpm-managed plugins (or when already running under pnpm);
   npm plugins get an `nvm use` message instead.
+- Fix: persistent-site detection hashed `$PWD` while the Playground CLI hashes
+  its resolved cwd, so launching through a symlinked path (or from a tool that
+  doesn't set `$PWD`) inspected the wrong site — a warm site read as "first
+  run" and was **reset**, and the tunnel-guard pre-flight checked a site the
+  CLI never boots. Both now key on the resolved working directory; a site that
+  was only ever reached via a symlinked path re-provisions once as its
+  identity moves.
+- Fix: screenshot pruning clamps `KROKEDIL_PG_KEEP_SHOTS` /
+  `KROKEDIL_PG_KEEP_COLLAGES` to positive integers — a non-numeric or zero
+  value made the "keep newest N" cut select **everything** for deletion.
+- Errors now surface as one `✖ playground: <message>` line instead of a raw
+  Node stack trace (the first thing a consumer with a config typo used to
+  see); `KROKEDIL_PG_DEBUG=1` restores the stack.
+- CLI: `--help`/`-h` (full command + flag reference on stdout) and
+  `--version`; `server` validates its mode against the plugin's configured
+  modes instead of failing later with `setup`/`start` listed as suggestions
+  (a start-only plugin is told to opt into blueprint modes rather than shown
+  an empty list); `compose` on a `modes: ['start']` plugin composes the
+  development blueprint (what `start` boots) instead of silently writing
+  nothing.
+- Config validation: malformed `composer.markers`, `modes`, `activate`,
+  `https.hosts`, `pages` entries, `php`, `wp` and `screenshots` now fail at
+  load with actionable messages instead of unrelated TypeErrors deep in the
+  launch (a string `https.hosts` used to spread character-by-character into
+  the mkcert SANs), and the per-mode keys (`options`, `pages`, `muPlugins`,
+  `extraSteps`) reject primitives instead of normalizing them to empty. An
+  explicit `composer: null` now opts out of composer install even when a
+  `composer.json` exists, as documented.
+- Fix: Ctrl+C during ngrok/mkcert startup (a window of up to ~20 s) killed the
+  launcher but orphaned the Playground child — and sometimes a live ngrok
+  agent holding the reserved domain; signals are now mirrored into the child
+  before the proxy starts.
+- Fix: the wordpress.org zip cache writes atomically (temp file + rename) with
+  backoff between download retries, and truncated cache entries from an
+  interrupted write are re-downloaded instead of installed.
+- Removed the never-used `runWithFreePort` from the public API
+  (`@krokedil/wp-playground-tools` exports); no consumer references it.
+- `init`: the scaffolded config's example `basePort` moves 8890 → 8900 —
+  8890 is klarna-payments-for-woocommerce's claimed registry row, so
+  uncommenting the example verbatim silently took its ports. The template also
+  documents `modes` (e2e opt-in + `init --update`).
 
 ## 1.1.1 — 2026-07-29
 
