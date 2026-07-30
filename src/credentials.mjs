@@ -239,9 +239,13 @@ export function runCredentials(
 		process.exitCode = 1;
 		return null;
 	}
-	// Commented-out examples are not configuration: scan the code only, or the
-	// scaffolded config's own envSecret() example lands in the central file.
-	const source = stripComments(fs.readFileSync(configPath, 'utf8'));
+	// Commented-out examples are not configuration. The name scan owns that
+	// guarantee itself — scanEnvSecretNames() strips internally — so it gets
+	// the raw text; the stripped copy below is for the slug match, where the
+	// scaffolded config's commented `pages:` example carries a `slug:` of its
+	// own.
+	const source = fs.readFileSync(configPath, 'utf8');
+	const code = stripComments(source);
 	const { names, skipped } = scanEnvSecretNames(source);
 	if (skipped) {
 		log(
@@ -257,7 +261,7 @@ export function runCredentials(
 		Object.hasOwn(resolved, name) && resolved[name] !== '';
 
 	const slug =
-		source.match(/\bslug\s*:\s*(['"`])([^'"`\n]+)\1/)?.[2] ??
+		code.match(/\bslug\s*:\s*(['"`])([^'"`\n]+)\1/)?.[2] ??
 		path.basename(root);
 	const plugin = ensureCredentialStubs(names, globalFile, { heading: slug });
 	const tooling = ensureCredentialStubs(TOOL_CREDENTIALS, globalFile, {
