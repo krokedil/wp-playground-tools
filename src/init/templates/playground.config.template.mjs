@@ -47,4 +47,9 @@ export default {
 	// depend on it. Parallel worktrees: override per run with
 	// --tunnel-domain=<second-reserved-domain|none>.
 	// tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' },
+
+	// For --https: the mkcert SAN list. Replaces the default ['localhost'] —
+	// keep 'localhost' in the list if you still browse there; the first entry
+	// becomes the host in the printed https URL.
+	// https: { hosts: [ 'localhost', 'my-plugin.test' ] },
 };

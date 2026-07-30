@@ -84,7 +84,7 @@ export default {
 	modes: ['start', 'development', 'demo'], // e2e is opt-in
 	screenshots: './tools/shots.config.mjs', // omit to disable the screenshots command
 	tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' }, // domain optional but recommended
-	https: { hosts: ['localhost'] },         // mkcert SANs for --https
+	https: { hosts: ['localhost'] },         // mkcert SANs for --https (replaces the default; first entry is the URL host)
 };
 ```
 
@@ -129,9 +129,17 @@ A missing or empty variable (GitHub renders absent/fork-PR secrets as empty stri
 
 ⚠ Resolved values land in `.playground/blueprint.<mode>.json` (gitignored + kernlignored) and in the persistent site's SQLite database — use **sandbox/test credentials only**, never production keys. The persistent `start` site only re-reads secrets on provisioning: after changing one, run `start --fresh` (`server` modes reprovision every run).
 
-## HTTPS
+## Transports (http, `--https`, `--tunnel`)
 
-Two flags, one mechanism: the tool writes the public URL to `.playground/proxy-url.txt` and the always-staged `playground-proxy-url.php` mu-plugin filters `home`/`siteurl` to it at runtime (no DB writes — warm boots and later proxy-less boots are untouched; the file is removed on exit and defensively on every non-proxied launch). `is_ssl()` is true behind the proxy, so cookies, assets and mixed content behave.
+The transport is a **per-run flag, not per-plugin config**: the same plugin — and the same persistent site — runs plain, behind local https, or behind a public tunnel, chosen at each invocation and combinable with any mode (`playground:start --https`, `playground:server-development --tunnel`, …). `playground.config.mjs` only parameterizes them (`tunnel.domain`, `https.hosts`); it never forces one. Even a payment plugin that needs `--tunnel` for webhook work doesn't need it all day — pick the cheapest transport the task at hand needs:
+
+| Working on | Run with | Why |
+|---|---|---|
+| Admin UI, settings pages, templates, most backend logic | *(no flag — plain http)* | Fastest, zero prerequisites, auto-login works |
+| Checkout/purchase flow, `is_ssl()`-dependent behavior, gateway scripts/iframes that require https, secure-context browser APIs | `--https` | Real TLS locally (mkcert); auto-login still works; nothing public, no ngrok account |
+| Provider webhooks/callbacks, redirects back from hosted payment pages, testing from a phone/other device | `--tunnel` | The outside world must reach the site; costs a password-gated login (auto-login is local-only) and reserved-domain hygiene. Inbound only — see the [outbound caveat](#-outbound-http-from-playground-is-flaky) |
+
+Both proxy flags share one mechanism: the tool writes the public URL to `.playground/proxy-url.txt` and the always-staged `playground-proxy-url.php` mu-plugin filters `home`/`siteurl` to it at runtime (no DB writes — warm boots and later proxy-less boots are untouched; the file is removed on exit and defensively on every non-proxied launch). `is_ssl()` is true behind the proxy, so cookies, assets and mixed content behave — and switching transport between runs leaves no residue in the site.
 
 ### `--tunnel` (public URL — payment-provider callbacks/webhooks)
 
