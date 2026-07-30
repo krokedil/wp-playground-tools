@@ -8,6 +8,8 @@
  *   setup                       install prerequisites only
  *   compose [mode…]             write the generated blueprint(s) for inspection
  *   screenshots [args…]         run the PR screenshot capture
+ *   credentials                 scan the config for envSecret() names and stub
+ *                               missing ones in ~/.config/krokedil-playground/.env
  *   init [--update]             scaffold (or refresh) a plugin's playground setup
  *
  * Cross-cutting flags for start/server:
@@ -107,6 +109,11 @@ export async function main(argv = process.argv.slice(2)) {
 			}
 			return;
 		}
+		case 'credentials': {
+			const { runCredentials } = await import('./credentials.mjs');
+			runCredentials(root);
+			return;
+		}
 		case 'setup':
 		case 'start': {
 			await runMode(root, command, rest);
@@ -119,7 +126,7 @@ export async function main(argv = process.argv.slice(2)) {
 		}
 		default:
 			process.stderr.write(
-				`usage: krokedil-playground <start|server <mode>|setup|compose|screenshots|init> [flags…]\n`
+				`usage: krokedil-playground <start|server <mode>|setup|compose|screenshots|credentials|init> [flags…]\n`
 			);
 			process.exitCode = command ? 1 : 0;
 	}

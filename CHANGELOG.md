@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Central credentials file: `~/.config/krokedil-playground/.env` is now loaded
+  as the lowest-priority env source, so one local file holds the `envSecret()`
+  credentials (and `NGROK_AUTHTOKEN` / `KROKEDIL_PG_TUNNEL_PASS`) for every
+  plugin checkout and worktree. Precedence: ambient env > plugin `.env` > main
+  checkout `.env` > central file; the "loaded N value(s)" message now names
+  the source file. A new `krokedil-playground credentials` subcommand (also
+  run by `init`) statically scans `playground.config.mjs` for `envSecret()`
+  names, reports which are set, and appends commented stubs for missing ones
+  to the central file. The committed `credentials.env.example` documents the
+  fleet's credential names — onboarding a plugin now includes adding its names
+  there via PR.
 - Repo-internal workflow polish (nothing consumer-visible): opened PRs get an
   automatic Copilot review request, CI runs superseded by a newer push to the
   same PR are cancelled, a PR template reminds about the changelog convention,

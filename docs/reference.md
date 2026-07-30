@@ -61,7 +61,7 @@ Useful flags: `--only a,b`, `--no-collage`, `--port N`, `--host H`, and before/a
 
 ## Environment variables
 
-A gitignored `.env` at the plugin root is loaded before the config is evaluated (ambient env wins; linked worktrees fall back to the main checkout's `.env`) — see [README — Private options](../README.md#private-options-api-keys). Variables the tool itself reads:
+Env files are loaded before the config is evaluated, first value per name wins: ambient env > the plugin root's gitignored `.env` > the main checkout's `.env` (from linked worktrees) > the central `~/.config/krokedil-playground/.env` shared by every plugin. `krokedil-playground credentials` stubs the names a plugin's config reads via `envSecret()` into the central file — see [README — Private options](../README.md#private-options-api-keys). Variables the tool itself reads:
 
 | Variable | Effect | Default |
 |---|---|---|

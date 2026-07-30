@@ -131,11 +131,14 @@ function detectIndent(content) {
 /**
  * Run the scaffold.
  *
- * @param {string}   root Plugin root (cwd).
- * @param {string[]} args CLI args after "init".
+ * @param {string}   root                  Plugin root (cwd).
+ * @param {string[]} args                  CLI args after "init".
+ * @param {Object}   [options]             Options.
+ * @param {Object}   [options.credentials] Passed to runCredentials() — lets
+ *                                         tests redirect the central env file.
  * @return {Promise<void>} Resolves when done.
  */
-export async function scaffold(root, args) {
+export async function scaffold(root, args, { credentials = {} } = {}) {
 	// Dogfooding guard: init inside this package itself would inject a
 	// self-referential git dependency and rewrite this repo's package.json,
 	// .npmrc and .nvmrc. The committed sandbox/ plugin is the way to run the
@@ -195,7 +198,9 @@ export async function scaffold(root, args) {
 	let basePort = 8880;
 	let modes = ['start', 'development', 'demo'];
 	try {
-		({ basePort, modes } = await loadConfig(root));
+		({ basePort, modes } = await loadConfig(root, {
+			globalFile: credentials.globalFile,
+		}));
 	} catch {
 		// Starter config not filled in yet — defaults.
 	}
@@ -426,6 +431,17 @@ export async function scaffold(root, args) {
 		) {
 			log('appended .kernlignore entries');
 		}
+	}
+
+	// --- central credentials stubs (per-user file, outside the repo) ---
+	// Surfaces which envSecret() names the config wants and stubs the missing
+	// ones in ~/.config/krokedil-playground/.env. Never fatal: onboarding must
+	// not fail over a credentials nicety.
+	try {
+		const { runCredentials } = await import('../credentials.mjs');
+		runCredentials(root, credentials);
+	} catch (err) {
+		log(`credentials check skipped (${err.message})`);
 	}
 
 	log(

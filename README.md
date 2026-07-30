@@ -51,6 +51,7 @@ pnpm run playground:server-e2e             # ephemeral, e2e fixture — needs 'e
 pnpm run playground:setup                  # prerequisites only
 pnpm run screenshots                       # PR screenshot collage (needs @playwright/test)
 pnpm exec krokedil-playground compose      # write the generated blueprints for inspection
+pnpm exec krokedil-playground credentials  # check envSecret() names; stub missing ones in ~/.config/krokedil-playground/.env
 pnpm exec krokedil-playground init --update
 ```
 
@@ -112,9 +113,9 @@ export default {
 };
 ```
 
-**Locally**: put the values in a gitignored `.env` at the plugin root (`NAME=value`; quotes, multi-line quoted values and `export` prefixes work). The tool loads it before evaluating the config. Already-set environment always wins over the file, and the tool never stores or prints values — warnings name variables only. Keep a committed `.env.example` with blank values so the needed names are discoverable.
+**Locally — the central file**: keep the values in `~/.config/krokedil-playground/.env`, one file shared by every plugin checkout and worktree (`NAME=value`; quotes, multi-line quoted values and `export` prefixes work). Seed it from the committed [`credentials.env.example`](credentials.env.example), or run `pnpm exec krokedil-playground credentials` in a plugin repo — it scans that plugin's config for `envSecret()` names and appends commented stubs for anything the file lacks (`init` does the same during onboarding). The tool loads the file before evaluating the config and never stores or prints values — warnings name variables only.
 
-**Git worktrees**: untracked files don't transfer into worktrees, so the main checkout's `.env` is found and used automatically from any linked worktree. Add a worktree-local `.env` only to override specific values (precedence: ambient env > worktree `.env` > main checkout `.env`).
+**Per-repo overrides**: a gitignored `.env` at the plugin root works exactly as before and overrides the central file for that checkout. Precedence: ambient env (shell exports, CI secrets) > plugin `.env` > main checkout `.env` (from linked git worktrees — untracked files don't transfer into them) > central file.
 
 **CI**: store the values as GitHub repo secrets and map them onto the step that runs the playground:
 
@@ -147,7 +148,7 @@ Both proxy flags share one mechanism: the tool writes the public URL to `.playgr
 pnpm run playground:start --tunnel
 ```
 
-Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` env or `ngrok config add-authtoken`; the tool never stores it — ngrok holds it). **Use your personal authtoken under the Krokedil pay-as-you-go account** (dashboard.ngrok.com → Your Authtoken), not a free personal account: free accounts allow only 1 simultaneous agent session, which breaks running several tunnels at once, and can't serve reserved domains. Webhook URLs built from `home_url()` automatically use the tunnel URL.
+Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` — best set once in the central `~/.config/krokedil-playground/.env` — or `ngrok config add-authtoken`; the tool never stores it — ngrok holds it). **Use your personal authtoken under the Krokedil pay-as-you-go account** (dashboard.ngrok.com → Your Authtoken), not a free personal account: free accounts allow only 1 simultaneous agent session, which breaks running several tunnels at once, and can't serve reserved domains. Webhook URLs built from `home_url()` automatically use the tunnel URL.
 
 **Reserve a domain for webhook work** (`tunnel.domain`): an ephemeral URL changes on every run, so callback registrations at the provider go stale. The tool warns loudly when tunneling without one. Reserve the domain at dashboard.ngrok.com/domains under the company account and claim it in the [tunnel domain registry](#tunnel-domain-registry).
 
@@ -157,7 +158,7 @@ Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` env or `ngrok co
 
 A tunnel URL is reachable by anyone who has it, and Playground's admin credentials are the documented default — so a plain `--tunnel` would leave `admin` / `password` one form submission away from the dashboard of a site holding your provider test keys. While a tunnel runs, the always-staged `playground-tunnel-guard.php` mu-plugin therefore refuses the default password for requests that didn't come from your machine, and accepts only that run's tunnel password (any user, wp-login and XML-RPC alike). Local logins, the development auto-login and PR screenshots are untouched, and the storefront, REST routes and webhook callbacks stay public — gating those is the whole reason for the tunnel.
 
-The password is printed with the public URL. Export `KROKEDIL_PG_TUNNEL_PASS` (shell profile, or the plugin's gitignored `.env`) to use one password you already know across every Krokedil playground instead; it is then required but never echoed. Without it, each run generates a random one. The mechanism mirrors the proxy URL: `.playground/tunnel-password.txt`, removed on exit and before every launch, so a non-tunnelled site is never gated.
+The password is printed with the public URL. Set `KROKEDIL_PG_TUNNEL_PASS` (best in the central `~/.config/krokedil-playground/.env` — see [Private options](#private-options-api-keys) — or a shell profile / the plugin's gitignored `.env`) to use one password you already know across every Krokedil playground instead; it is then required but never echoed. Without it, each run generates a random one. The mechanism mirrors the proxy URL: `.playground/tunnel-password.txt`, removed on exit and before every launch, so a non-tunnelled site is never gated.
 
 A site provisioned before this guard existed has no symlink to it, so `--tunnel` on such a warm `start` site refuses to launch and asks for one `--fresh` run. Guarded or not, a playground is a dev site — keep production keys and real customer data out (see [Private options](#private-options-api-keys)).
 

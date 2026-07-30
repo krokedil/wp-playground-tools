@@ -6,14 +6,16 @@
  * NGROK_AUTHTOKEN precedent). See "Private options" in README.md.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 
 /**
  * Env names must be shell-safe identifiers; parseEnv on Node 20 can glue a
  * malformed line into the next line's key, so anything else is dropped.
+ * Also used by the credentials scan to validate names found in configs.
  */
-const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
  * Names that collide with Object.prototype machinery. Assigning __proto__ on
@@ -33,6 +35,34 @@ const warnedNames = new Set();
  */
 function warn(msg) {
 	process.stderr.write(`▶ playground: ${msg}\n`);
+}
+
+/**
+ * The central per-user env file, shared by every plugin checkout. Lives next
+ * to the tool's other per-user state (zip cache, mkcert certs).
+ *
+ * @return {string} Absolute path to ~/.config/krokedil-playground/.env.
+ */
+export function globalEnvFile() {
+	return path.join(os.homedir(), '.config', 'krokedil-playground', '.env');
+}
+
+/**
+ * A path as shown in warnings: the plugin's own .env stays short, anything
+ * under the home directory gets a ~ prefix.
+ *
+ * @param {string} file Absolute path.
+ * @param {string} root Plugin root directory (absolute).
+ * @return {string} Display form of the path.
+ */
+function displayPath(file, root) {
+	if (file === path.join(root, '.env')) {
+		return '.env';
+	}
+	const home = os.homedir();
+	return file.startsWith(home + path.sep)
+		? '~' + file.slice(home.length)
+		: file;
 }
 
 /**
@@ -74,22 +104,29 @@ function mainCheckoutRoot(root) {
  * Load .env values into `env` without overriding anything already set.
  *
  * Files applied in priority order: <root>/.env, then the main checkout's .env
- * when root is a linked git worktree. First value set for a name wins, so the
- * net precedence is: ambient env (CI secrets, shell exports) > worktree .env
- * > main-checkout .env. Missing files are silently fine (the CI case).
+ * when root is a linked git worktree, then the central per-user file
+ * (~/.config/krokedil-playground/.env — one place for credentials shared by
+ * every plugin). First value set for a name wins, so the net precedence is:
+ * ambient env (CI secrets, shell exports) > worktree .env > main-checkout
+ * .env > central file. Missing files are silently fine (the CI case).
  *
- * @param {string} root          Plugin root directory (absolute).
- * @param {Object} [options]     Options.
- * @param {Object} [options.env] Target env map (default process.env).
+ * @param {string} root                 Plugin root directory (absolute).
+ * @param {Object} [options]            Options.
+ * @param {Object} [options.env]        Target env map (default process.env).
+ * @param {string} [options.globalFile] Central file path (test injection).
  * @return {{loaded: boolean, applied: string[]}} Whether any file was read,
  *                                                and the names actually set.
  */
-export function applyEnvFile(root, { env = process.env } = {}) {
+export function applyEnvFile(
+	root,
+	{ env = process.env, globalFile = globalEnvFile() } = {}
+) {
 	const candidates = [path.join(root, '.env')];
 	const mainRoot = mainCheckoutRoot(root);
 	if (mainRoot) {
 		candidates.push(path.join(mainRoot, '.env'));
 	}
+	candidates.push(globalFile);
 
 	let loaded = false;
 	const applied = [];
@@ -106,9 +143,11 @@ export function applyEnvFile(root, { env = process.env } = {}) {
 			throw new Error(`could not read ${file}: ${err.message}`);
 		}
 		loaded = true;
+		const label = displayPath(file, root);
 		// A BOM would otherwise stick to the first key.
 		const parsed = parseEnv(content.replace(/^\uFEFF/, ''));
 		let malformed = false;
+		let appliedFromFile = 0;
 		for (const [name, value] of Object.entries(parsed)) {
 			if (!VALID_NAME.test(name)) {
 				// Never echo the line — a malformed line may itself be a
@@ -118,7 +157,7 @@ export function applyEnvFile(root, { env = process.env } = {}) {
 			}
 			if (RESERVED_NAMES.has(name)) {
 				// The name isn't secret content, so it's safe to print.
-				warn(`skipping reserved variable name "${name}" in .env`);
+				warn(`skipping reserved variable name "${name}" in ${label}`);
 				continue;
 			}
 			// Own properties only: `in` would treat names shadowing
@@ -128,6 +167,7 @@ export function applyEnvFile(root, { env = process.env } = {}) {
 			}
 			env[name] = value;
 			applied.push(name);
+			appliedFromFile++;
 		}
 		if (malformed) {
 			warn(
@@ -135,9 +175,11 @@ export function applyEnvFile(root, { env = process.env } = {}) {
 					'some variables may be ignored.'
 			);
 		}
-	}
-	if (applied.length) {
-		warn(`loaded ${applied.length} value(s) from .env`);
+		// One line per source, so precedence stays debuggable when the same
+		// name exists in several files.
+		if (appliedFromFile) {
+			warn(`loaded ${appliedFromFile} value(s) from ${label}`);
+		}
 	}
 	return { loaded, applied };
 }
@@ -163,7 +205,11 @@ export function envSecret(name, { env = process.env } = {}) {
 	}
 	if (!warnedNames.has(name)) {
 		warnedNames.add(name);
-		warn(`${name} is not set — the corresponding option will be omitted.`);
+		warn(
+			`${name} is not set — the corresponding option will be omitted ` +
+				`(set it in the plugin's .env or in ` +
+				`~/.config/krokedil-playground/.env).`
+		);
 	}
 	return undefined;
 }
