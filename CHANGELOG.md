@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.3 — 2026-07-30
 
 - The `envSecret()` scan behind `credentials` (and behind `init`) now strips
   line and block comments before looking for names, so commented-out examples
@@ -12,23 +12,20 @@
   checkout, to be deleted by hand afterwards. The strip is a quote-aware walk,
   so `'https://…'` and `// see 'X'` are each read the right way round.
 
-- Registry bookkeeping for onboarding qliro-for-woocommerce: `basePort` 8900
-  claimed in the port registry, and the plugin's `QLIRO_TEST_API_KEY` /
-  `QLIRO_TEST_API_SECRET` names documented in `credentials.env.example`.
+- Registry bookkeeping for onboarding qliro-for-woocommerce and
+  klarna-checkout-for-woocommerce: `basePort` 8900 and 8910 claimed in the port
+  registry, and the plugins' `QLIRO_TEST_API_KEY` / `QLIRO_TEST_API_SECRET` and
+  `KCO_TEST_MERCHANT_ID_EU` / `KCO_TEST_SHARED_SECRET_EU` names documented in
+  `credentials.env.example`.
 - The example `basePort` in the scaffolded config *and* in the README's schema
-  block now both point at the registry's free row (8910), and a test pins them
+  block now both point at the registry's free row (8920), and a test pins them
   there. Claiming a port used to leave the examples pointing at it: 8890 was
-  klarna-payments' row (fixed in 1.2.0, see below), 8900 then became qliro's.
-  The README schema example was the worse of the two — it was 8880,
-  returns-and-withdrawals' row, and copying it *sets* `basePort`, so the
-  "unset basePort" warning never fired and the collision was silent. The test
-  parses the registry table, so the next claim fails CI until both examples and
-  the "next plugin here" row move together.
-- Registry bookkeeping for onboarding klarna-checkout-for-woocommerce: `basePort`
-  8910 claimed in the port registry, and the plugin's `KCO_TEST_MERCHANT_ID_EU` /
-  `KCO_TEST_SHARED_SECRET_EU` names documented in `credentials.env.example`. The
-  example `basePort` in the scaffolded config and the README schema block move to
-  8920, the registry's new free row.
+  klarna-payments' row (fixed in 1.2.0, see below), and 8900 then 8910 became
+  qliro's and klarna-checkout's. The README schema example was the worse of the
+  two — it was 8880, returns-and-withdrawals' row, and copying it *sets*
+  `basePort`, so the "unset basePort" warning never fired and the collision was
+  silent. The test parses the registry table, so the next claim fails CI until
+  both examples and the "next plugin here" row move together.
 - The `credentials.env.example` blocks no longer assert that a gateway's "Test
   mode" is on by default: this repo can't test another repo's runtime defaults,
   so the claim could rot silently. Both the qliro and klarna-checkout entries now
