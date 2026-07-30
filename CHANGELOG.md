@@ -45,6 +45,17 @@
   tunnel guard owns login behavior), and clears the WooCommerce cart along with
   the session. No customer account is seeded: this covers logged-out testing,
   not logged-in-customer testing.
+- Fix: the explicit chmod on the two runtime contract files now covers
+  everything staged into `.playground/` — the mu-plugins, the seeder's
+  `seed-data.json` and the pre-downloaded plugin zips — through one shared
+  `src/runtime-file.mjs`, which also gives the staging directories themselves
+  mode 0755 so a runtime on another uid can traverse into them at all. Files
+  needed it for a second reason besides the umask: `copyFileSync` inherits the
+  *source* file's mode, so a checkout whose files are 0600 staged owner-only
+  mu-plugins no matter how permissive the developer's umask was. The generated
+  blueprint keeps default permissions — the host CLI reads it, not the site,
+  and it can carry private options from `.env` — as does the host-side zip
+  download cache under `~/.config`, which is not read from inside the runtime.
 - Development mode now stages a `playground-dev-login.php` mu-plugin that
   auto-submits any plain GET of wp-login.php as `admin`. The Playground CLI's
   own auto-login is single-shot per client — a curl health check or tool probe

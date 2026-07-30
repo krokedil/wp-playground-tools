@@ -236,37 +236,47 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 		fs.rmSync(root, { recursive: true, force: true });
 		fs.rmSync(cache, { recursive: true, force: true });
 	});
-	for (const slug of [
-		'woocommerce',
-		'query-monitor',
-		'show-hidden-post-meta',
-		'transients-manager',
-		'wp-mail-logging',
-	]) {
-		fs.writeFileSync(path.join(cache, `${slug}.zip`), 'x'.repeat(2000));
+	// Stage everything under an owner-only umask: that is the shell the
+	// runtime-readability bug hides in — sources are created 0600, and both
+	// copyFileSync's mode inheritance and writeFileSync's `mode` option go
+	// through open(2), so only an explicit chmod survives it.
+	const previousUmask = process.umask(0o077);
+	let blueprintPath;
+	try {
+		for (const slug of [
+			'woocommerce',
+			'query-monitor',
+			'show-hidden-post-meta',
+			'transients-manager',
+			'wp-mail-logging',
+		]) {
+			fs.writeFileSync(path.join(cache, `${slug}.zip`), 'x'.repeat(2000));
+		}
+
+		// A plugin-local mu-plugin + seed data to stage.
+		fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
+		fs.writeFileSync(
+			path.join(root, 'tools', 'my-helper.php'),
+			'<?php // helper'
+		);
+		fs.writeFileSync(
+			path.join(root, 'tools', 'seed.json'),
+			JSON.stringify({ products: [] })
+		);
+
+		const config = normalizeConfig({
+			slug: 'a-plugin',
+			muPlugins: { development: ['tools/my-helper.php'] },
+			seedData: 'tools/seed.json',
+		});
+		({ blueprintPath } = await composeAndStage(
+			root,
+			config,
+			'development'
+		));
+	} finally {
+		process.umask(previousUmask);
 	}
-
-	// A plugin-local mu-plugin + seed data to stage.
-	fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
-	fs.writeFileSync(
-		path.join(root, 'tools', 'my-helper.php'),
-		'<?php // helper'
-	);
-	fs.writeFileSync(
-		path.join(root, 'tools', 'seed.json'),
-		JSON.stringify({ products: [] })
-	);
-
-	const config = normalizeConfig({
-		slug: 'a-plugin',
-		muPlugins: { development: ['tools/my-helper.php'] },
-		seedData: 'tools/seed.json',
-	});
-	const { blueprintPath } = await composeAndStage(
-		root,
-		config,
-		'development'
-	);
 
 	assert.equal(
 		blueprintPath,
@@ -283,9 +293,26 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 		'plugins/woocommerce.zip',
 		'plugins/wp-mail-logging.zip',
 	]) {
-		assert.ok(
-			fs.existsSync(path.join(root, '.playground', staged)),
-			`not staged: ${staged}`
+		const file = path.join(root, '.playground', staged);
+		assert.ok(fs.existsSync(file), `not staged: ${staged}`);
+		// Staged modes must not depend on the developer's umask: where the
+		// runtime reaches the mount as another uid, an owner-only file is
+		// unreadable there and its mu-plugin or step fails silently.
+		// `% 0o10` is the "other" permission digit (no-bitwise forbids `&`).
+		assert.equal(
+			fs.statSync(file).mode % 0o10,
+			0o4,
+			`not runtime-readable: ${staged}`
+		);
+	}
+	// And the directories holding them: a readable file inside an owner-only
+	// directory is still unreachable, since reading it means traversing in.
+	for (const dir of ['', 'mu-plugins', 'plugins']) {
+		const staged = path.join(root, '.playground', dir);
+		assert.equal(
+			fs.statSync(staged).mode % 0o10,
+			0o5,
+			`not runtime-traversable: .playground/${dir}`
 		);
 	}
 	// Every wordpress.org installPlugin step was rewritten to the staged zip.
