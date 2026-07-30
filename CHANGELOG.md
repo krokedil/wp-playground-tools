@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Documented the credential-variable naming rule: `<ABBR>_<OPTION>`, where
+  `<ABBR>` is the plugin's abbreviation in Krokedil CI's plugin registry,
+  uppercased — the same identifier behind `<ABBR>_LOCAL_DIR` and the plugin's
+  GitHub secret names. The convention was already what `credentials.env.example`
+  followed (`KP_`, `QLIRO_`, `KCO_`) and what CI expects, but nothing said so,
+  and the README's `envSecret()` examples taught invented names
+  (`KLARNA_TEST_MERCHANT_ID`) that would have collided in the shared central env
+  file and never matched a repo secret. The rule now lives in the README's
+  private-options section, the onboarding guide, and the header of
+  `credentials.env.example`; the port registry gained an `Abbr` column, so a
+  plugin claims its port and its credential prefix in one PR.
+
 - `pnpm run lint` and `pnpm run format:check` now ignore `.claude/worktrees/`,
   so keeping git worktrees inside the checkout no longer drowns the real
   output. A nested worktree is a whole copy of this repo, and ignore patterns

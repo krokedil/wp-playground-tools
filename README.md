@@ -105,13 +105,15 @@ export default {
 			woocommerce_klarna_settings: {
 				enabled: 'yes',
 				testmode: 'yes',
-				test_merchant_id: envSecret('KLARNA_TEST_MERCHANT_ID'),
-				test_shared_secret: envSecret('KLARNA_TEST_SHARED_SECRET'),
+				test_merchant_id: envSecret('KP_TEST_MERCHANT_ID_SE'),
+				test_shared_secret: envSecret('KP_TEST_SHARED_SECRET_SE'),
 			},
 		},
 	},
 };
 ```
+
+**Naming**: `<ABBR>_<OPTION>`, where `<ABBR>` is the plugin's abbreviation in Krokedil CI's plugin registry (`repos.json`), uppercased — the same identifier behind `<ABBR>_LOCAL_DIR` and the plugin's GitHub secret names (`kp` → `KP_TEST_MERCHANT_ID_SE`). Reuse the plugin's existing abbreviation instead of inventing a prefix: one central file serves every plugin, so prefixes must not collide, and identical names mean the local file and the CI secrets line up 1:1. Market/region suffixes go last (`_SE`, `_EU`). The [port registry](#port-registry) lists the abbreviations of the plugins onboarded so far.
 
 **Locally — the central file**: keep the values in `~/.config/krokedil-playground/.env`, one file shared by every plugin checkout and worktree (`NAME=value`; quotes, multi-line quoted values and `export` prefixes work). Seed it from the committed [`credentials.env.example`](credentials.env.example), or run `pnpm exec krokedil-playground credentials` in a plugin repo — it scans that plugin's config for `envSecret()` names and appends commented stubs for anything the file lacks (`init` does the same during onboarding). The tool loads the file before evaluating the config and never stores or prints values — warnings name variables only.
 
@@ -122,8 +124,8 @@ export default {
 ```yaml
 - run: pnpm run playground:server-development
   env:
-    KLARNA_TEST_MERCHANT_ID: ${{ secrets.KLARNA_TEST_MERCHANT_ID }}
-    KLARNA_TEST_SHARED_SECRET: ${{ secrets.KLARNA_TEST_SHARED_SECRET }}
+    KP_TEST_MERCHANT_ID_SE: ${{ secrets.KP_TEST_MERCHANT_ID_SE }}
+    KP_TEST_SHARED_SECRET_SE: ${{ secrets.KP_TEST_SHARED_SECRET_SE }}
 ```
 
 A missing or empty variable (GitHub renders absent/fork-PR secrets as empty strings) prints one warning naming it, the option key is omitted, and the site boots unconfigured — provisioning never fails over a missing secret. Per-mode keys (test vs. prod) use the existing per-mode `options` shape.
@@ -182,16 +184,16 @@ Playground's PHP-in-WASM has no mail transport (no sendmail binary or MTA), so P
 
 ## Port registry
 
-Give each plugin a distinct `basePort` so concurrent plugin development doesn't rely on probing. Claim a row when you onboard a plugin:
+Give each plugin a distinct `basePort` so concurrent plugin development doesn't rely on probing. Claim a row when you onboard a plugin — `Abbr` is the plugin's Krokedil CI abbreviation, which is also the prefix for its [credential variables](#private-options-api-keys), so claim both in the same PR:
 
-| basePort | Plugin |
-|---|---|
-| 8880 | returns-and-withdrawals |
-| 8890 | klarna-payments-for-woocommerce |
-| 8900 | qliro-for-woocommerce |
-| 8910 | klarna-checkout-for-woocommerce |
-| 8920 | *(next plugin here)* |
-| 9880 | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
+| basePort | Abbr | Plugin |
+|---|---|---|
+| 8880 | `rwwc` | returns-and-withdrawals |
+| 8890 | `kp` | klarna-payments-for-woocommerce |
+| 8900 | `qliro` | qliro-for-woocommerce |
+| 8910 | `kco` | klarna-checkout-for-woocommerce |
+| 8920 | | *(next plugin here)* |
+| 9880 | — | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
 
 8880 is also the tool's fallback when `basePort` is unset (returns-and-withdrawals claims it explicitly) — never rely on the fallback; the tool warns on every run until `basePort` is set.
 
