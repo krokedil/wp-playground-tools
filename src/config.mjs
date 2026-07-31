@@ -61,12 +61,15 @@ function fail(message) {
  * @return {string} The validated domain.
  */
 export function validateTunnelDomain(domain, name = 'tunnel.domain') {
+	// A leading "*." is a wildcard reservation: the tool serves one derived
+	// subdomain per worktree under it, so parallel checkouts don't collide.
 	const hostname =
-		/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+		/^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 	if (typeof domain !== 'string' || !hostname.test(domain)) {
 		throw new Error(
-			`"${name}" must be a bare hostname like "my-plugin.eu.ngrok.io" ` +
-				`(no https://, path or port), got ${JSON.stringify(domain)}.`
+			`"${name}" must be a bare hostname like "my-plugin.eu.ngrok.io" or a ` +
+				`wildcard like "*.krokedil.ngrok.io" (no https://, path or port), ` +
+				`got ${JSON.stringify(domain)}.`
 		);
 	}
 	return domain;

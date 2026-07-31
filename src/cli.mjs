@@ -43,9 +43,9 @@ Cross-cutting flags for start/server:
   --fresh                      reprovision the persistent site (start only)
   --tunnel                     expose the site over https via ngrok (public
                                URL, webhooks)
-  --tunnel-domain=<host|none>  per-run tunnel domain override (implies
-                               --tunnel; 'none' forces an ephemeral URL —
-                               parallel worktrees)
+  --tunnel-domain=<host>       per-run tunnel domain override (implies
+                               --tunnel). A wildcard tunnel.domain already
+                               gives each worktree its own host.
   --https                      serve https locally via mkcert + reverse proxy
                                (no tunnel)
 

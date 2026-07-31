@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- `tunnel.domain` accepts a **wildcard** (`*.krokedil.ngrok.io`, reserved once
+  for the company account), and each checkout derives its own host under it:
+  `<slug>-<8 hex of sha256(cwd)>` — the same digest that keys the persistent
+  site. Parallel worktrees can now tunnel simultaneously with no flags and no
+  bookkeeping, and each URL is *stable* for its worktree, so provider callback
+  registrations keep working. This replaces "reserve a domain per plugin": the
+  README's tunnel domain registry is now only for plugins that need a fixed
+  hostname because a provider portal stores it.
+
+  The old advice could not work. Omitting the domain does **not** yield a
+  random URL — ngrok binds the account's single default domain, so a second
+  worktree collided with `ERR_NGROK_334` and the error hint recommended
+  `--tunnel-domain=none`, which lands in the same place. (Random URLs are a
+  paid-plan feature, `--url 'https://'`, and silently fall back when the
+  account lacks the entitlement.) The hint and the docs now say so.
+
 - `pnpm run lint` and `pnpm run format:check` now ignore `.claude/worktrees/`,
   so keeping git worktrees inside the checkout no longer drowns the real
   output. A nested worktree is a whole copy of this repo, and ignore patterns

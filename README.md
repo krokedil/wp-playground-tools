@@ -84,7 +84,8 @@ export default {
 	extraSteps: { demo: [ /* raw blueprint step objects */ ] },     // escape hatch — appended verbatim
 	modes: ['start', 'development', 'demo'], // e2e is opt-in
 	screenshots: './tools/shots.config.mjs', // omit to disable the screenshots command
-	tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' }, // domain optional but recommended
+	tunnel: { provider: 'ngrok', domain: '*.krokedil.ngrok.io' },   // wildcard: one derived host per worktree
+	                                         // (a bare hostname pins every worktree to one URL instead)
 	https: { hosts: ['localhost'] },         // mkcert SANs for --https (replaces the default; first entry is the URL host)
 };
 ```
@@ -152,9 +153,11 @@ pnpm run playground:start --tunnel
 
 Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` — best set once in the central `~/.config/krokedil-playground/.env` — or `ngrok config add-authtoken`; the tool never stores it — ngrok holds it). **Use your personal authtoken under the Krokedil pay-as-you-go account** (dashboard.ngrok.com → Your Authtoken), not a free personal account: free accounts allow only 1 simultaneous agent session, which breaks running several tunnels at once, and can't serve reserved domains. Webhook URLs built from `home_url()` automatically use the tunnel URL.
 
-**Reserve a domain for webhook work** (`tunnel.domain`): an ephemeral URL changes on every run, so callback registrations at the provider go stale. The tool warns loudly when tunneling without one. Reserve the domain at dashboard.ngrok.com/domains under the company account and claim it in the [tunnel domain registry](#tunnel-domain-registry).
+**Set `tunnel.domain` to the wildcard** — `tunnel: { provider: 'ngrok', domain: '*.krokedil.ngrok.io' }`. A wildcard reservation serves any single-label subdomain without reserving it first, and the tool derives one host per checkout: `<slug>-<8 hex of sha256(cwd)>.krokedil.ngrok.io`, the same digest that keys the persistent site. That URL is **stable** for a worktree (callback registrations at a provider keep working) and **distinct** between worktrees, so one reservation covers the whole fleet with no per-plugin bookkeeping.
 
-**Parallel worktrees**: sites, ports and tunnels are per-worktree automatically (each worktree gets its own persistent site and auto-shifts to a free port). The one shared thing is the committed `tunnel.domain` — a second simultaneous tunnel on the same plugin needs `--tunnel-domain=<second-reserved-domain>` (stable webhooks; claim it in the registry) or `--tunnel-domain=none` (quick ephemeral URL). The flag implies `--tunnel`.
+Without a domain the agent binds your account's single default domain, so a second run anywhere collides with `ERR_NGROK_334` — the tool warns when you tunnel that way. Note that omitting the domain does **not** produce a random URL: ngrok's random-URL generation (`--url 'https://'`) is a paid-plan feature and falls back to the default domain when the account lacks it.
+
+**Parallel worktrees**: sites, ports and tunnels are per-worktree automatically — with the wildcard, two checkouts of the same plugin tunnel simultaneously on their own hosts, no flags needed. `--tunnel-domain=<host>` still overrides for one run (it implies `--tunnel`), which is what you want when a provider portal has a fixed URL registered.
 
 #### Tunnel logins need the run password
 
@@ -197,11 +200,11 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 
 ## Tunnel domain registry
 
-Reserve tunnel domains under the company ngrok pay-as-you-go account (dashboard.ngrok.com/domains) and claim a row per domain. Plugins under active parallel development may claim more than one (the extra ones are used via `--tunnel-domain=`):
+**Most plugins need no row here.** The company account reserves the wildcard **`*.krokedil.ngrok.io`** (dashboard.ngrok.com/domains), and `tunnel: { domain: '*.krokedil.ngrok.io' }` gives every plugin — and every worktree of it — its own derived, stable host under that one reservation. Claim a row below only for a **fixed** hostname, i.e. when a provider portal stores a callback URL that must not vary by checkout:
 
-| tunnel.domain | Plugin |
-|---|---|
-| *(none reserved yet — claim the first row when you reserve a domain)* | |
+| tunnel.domain | Plugin | Why it needs a fixed host |
+|---|---|---|
+| *(none — the wildcard covers everything so far)* | | |
 
 ## Logs / database
 

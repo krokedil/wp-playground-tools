@@ -17,6 +17,7 @@ import {
 import {
 	clearProxyUrl,
 	clearTunnelPassword,
+	expandTunnelDomain,
 	proxyUrlFile,
 	resolveTunnelDomain,
 	resolveTunnelPassword,
@@ -132,7 +133,7 @@ test('hintForNgrokError maps known codes to actionable hints', () => {
 	assert.equal(hintForNgrokError(null), null);
 });
 
-test('resolveTunnelDomain: override wins, "none" forces ephemeral', () => {
+test('resolveTunnelDomain: override wins, "none" clears the domain', () => {
 	const config = { tunnel: { provider: 'ngrok', domain: 'kp.eu.ngrok.io' } };
 	assert.equal(resolveTunnelDomain(config), 'kp.eu.ngrok.io');
 	assert.equal(
@@ -144,6 +145,50 @@ test('resolveTunnelDomain: override wins, "none" forces ephemeral', () => {
 	assert.equal(
 		resolveTunnelDomain({ tunnel: null }, 'x.ngrok.io'),
 		'x.ngrok.io'
+	);
+});
+
+test('expandTunnelDomain: a wildcard becomes one stable host per worktree', () => {
+	const opts = { slug: 'qliro-for-woocommerce', cwd: '/repos/qliro' };
+	const host = expandTunnelDomain('*.krokedil.ngrok.io', opts);
+
+	assert.match(
+		host,
+		/^qliro-for-woocommerce-[0-9a-f]{8}\.krokedil\.ngrok\.io$/
+	);
+	// Same worktree, same URL on every run — callback registrations survive.
+	assert.equal(expandTunnelDomain('*.krokedil.ngrok.io', opts), host);
+	// A second checkout of the same plugin gets its own host, so both can run.
+	assert.notEqual(
+		expandTunnelDomain('*.krokedil.ngrok.io', {
+			...opts,
+			cwd: '/repos/qliro-worktree-2',
+		}),
+		host
+	);
+});
+
+test('expandTunnelDomain: passes non-wildcards through, keeps labels legal', () => {
+	const opts = { slug: 'my-plugin', cwd: '/repos/x' };
+	assert.equal(expandTunnelDomain('kp.eu.ngrok.io', opts), 'kp.eu.ngrok.io');
+	assert.equal(expandTunnelDomain(null, opts), null);
+
+	// Only the digest guarantees uniqueness, so an over-long slug is what gives.
+	const long = expandTunnelDomain('*.krokedil.ngrok.io', {
+		slug: 'a'.repeat(80),
+		cwd: '/repos/x',
+	});
+	const label = long.split('.')[0];
+	assert.ok(label.length <= 63, `label too long: ${label.length}`);
+	assert.match(label, /^a+-[0-9a-f]{8}$/);
+
+	// Slugs are lowercased and stripped of anything DNS would reject.
+	assert.match(
+		expandTunnelDomain('*.krokedil.ngrok.io', {
+			slug: 'My_Plugin!',
+			cwd: '/repos/x',
+		}),
+		/^my-plugin-[0-9a-f]{8}\.krokedil\.ngrok\.io$/
 	);
 });
 
@@ -248,6 +293,41 @@ test('the runtime contract files stay readable under a restrictive umask', (t) =
 		fs.statSync(path.join(root, '.playground')).mode % 0o10,
 		0,
 		'the runtime must be able to traverse into .playground'
+	);
+});
+
+test('startProxy hands the provider the expanded wildcard host', async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-wildcard-'));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	let served = null;
+	const providers = {
+		ngrok: async () => ({
+			startTunnel: async ({ domain }) => {
+				served = domain;
+				return { url: `https://${domain}`, stop: async () => {} };
+			},
+		}),
+	};
+
+	const proxy = await startProxy(
+		root,
+		{ slug: 'my-plugin', tunnel: { domain: '*.krokedil.ngrok.io' } },
+		{ port: 9881, kind: 'tunnel', providers }
+	);
+	t.after(() => proxy.stop());
+
+	// The provider must never see the wildcard itself — ngrok would reject it.
+	assert.equal(
+		served,
+		expandTunnelDomain('*.krokedil.ngrok.io', {
+			slug: 'my-plugin',
+			cwd: root,
+		})
+	);
+	assert.equal(
+		fs.readFileSync(proxyUrlFile(root), 'utf8').trim(),
+		`https://${served}`
 	);
 });
 

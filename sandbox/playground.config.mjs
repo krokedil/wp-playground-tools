@@ -12,7 +12,8 @@ export default {
 	// plugins so concurrent dogfooding never collides with real plugin dev.
 	basePort: 9880,
 
-	// No domain on purpose: developers with a reserved ngrok domain add it
-	// locally; the loud free-tier warning on --tunnel is expected.
-	tunnel: { provider: 'ngrok' },
+	// The company wildcard, same as the plugins use: --tunnel here derives
+	// sandbox-<hash of this checkout>.krokedil.ngrok.io, so dogfooding a tunnel
+	// never collides with a plugin's run or another worktree's.
+	tunnel: { provider: 'ngrok', domain: '*.krokedil.ngrok.io' },
 };
