@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { computeSiteHash } from '../prepare.mjs';
+import { computeSiteHash } from '../site-id.mjs';
 import { writeRuntimeReadable } from '../runtime-file.mjs';
 
 /** Registered tunnel providers. cloudflared etc. are later drop-ins. */

@@ -22,7 +22,6 @@ export {
 export {
 	buildLaunchArgs,
 	buildModes,
-	computeSiteHash,
 	decideBlueprint,
 	ensurePrereqs,
 	isProvisioned,
@@ -30,6 +29,17 @@ export {
 	nodeSatisfiesPin,
 	resolvePlaygroundBin,
 } from './prepare.mjs';
+export {
+	computeSiteHash,
+	deriveSiteId,
+	nextSiteToken,
+	publishSiteId,
+	readSiteRegistry,
+	recordSiteId,
+	resolveSiteId,
+	siteIdFile,
+	siteRegistryFile,
+} from './site-id.mjs';
 export { findFreePort, isPortFree, resolvePort } from './port.mjs';
 export { composeAndStage, composeBlueprint } from './blueprint/compose.mjs';
 export * as blueprintSteps from './blueprint/steps.mjs';

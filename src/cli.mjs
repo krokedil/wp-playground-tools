@@ -37,6 +37,8 @@ Commands:
   screenshots [args…]          run the PR screenshot capture
   credentials                  scan the config for envSecret() names and stub
                                missing ones in ~/.config/krokedil-playground/.env
+  site-id [<id>]               print this checkout's site id (the order-number
+                               prefix), or resolve one back to its checkout
   init [--update]              scaffold (or refresh) a plugin's playground setup
 
 Cross-cutting flags for start/server:
@@ -170,6 +172,13 @@ async function run(argv) {
 		case 'credentials': {
 			const { runCredentials } = await import('./credentials.mjs');
 			runCredentials(root);
+			return;
+		}
+		case 'site-id': {
+			// No config needed: the id is derived from the path, so this
+			// answers in any checkout, before a first boot too.
+			const { runSiteId } = await import('./site-id.mjs');
+			process.exitCode = runSiteId(root, rest);
 			return;
 		}
 		case 'setup':

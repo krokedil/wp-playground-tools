@@ -52,6 +52,7 @@ pnpm run playground:setup                  # prerequisites only
 pnpm run screenshots                       # PR screenshot collage (needs @playwright/test)
 pnpm exec krokedil-playground compose      # write the generated blueprints for inspection
 pnpm exec krokedil-playground credentials  # check envSecret() names; stub missing ones in ~/.config/krokedil-playground/.env
+pnpm exec krokedil-playground site-id      # this checkout's order-number prefix; pass an id to resolve one back to its checkout
 pnpm exec krokedil-playground init --update
 ```
 
@@ -217,6 +218,15 @@ Order numbers on a playground site read `c345befa-38`, not `38`. Gateways send t
 The prefix is this checkout's **site id**: the first 8 characters of the same `sha256(cwd)` digest that keys the persistent site and the wildcard tunnel host, so a reference in a provider's portal names the site that produced it — `c345befa-38` came from the checkout serving `…-c345befa.krokedil.ngrok.io`. It is printed at boot. The id is stable for a checkout, which matters because some gateways later compare the stored reference against the order number; `--fresh` is the exception, since the site renumbers from 1 and would re-send references it already used, so each reprovision advances a counter (`c345befa-2-38`).
 
 Mechanically it is display only — a `woocommerce_order_number` filter (priority 5, so plugins that build their own numbers from the parent's still win) fed by `.playground/site-id.txt`. The underlying order ID is untouched, so anything looking an order up by ID is unaffected, and the mu-plugin is inert without that file.
+
+**Reading an id back** — the point of a reference like `c345befa-2-38` in a provider's portal is finding out who made it:
+
+```sh
+pnpm exec krokedil-playground site-id              # → c345befa-2, plus this checkout's path and branch
+pnpm exec krokedil-playground site-id c345befa-2   # → the checkout that produced it (any directory, any repo)
+```
+
+Resolution reads `~/.config/krokedil-playground/sites.json`, which every launch upserts with the checkout's path, plugin slug and **the branch as of that boot** — a path outlives the branch checked out in it, so recording it at boot is the only way to answer "which branch placed this order" afterwards. It lists checkouts that have booted a playground on this machine; an unknown id exits non-zero saying so. The registry is a convenience: if it can't be written (read-only `$HOME`, CI), the launch carries on regardless.
 
 ## Logs / database
 

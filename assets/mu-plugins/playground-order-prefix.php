@@ -40,9 +40,11 @@ function krokedil_pg_order_prefix_id() {
 	}
 	$file = dirname( __DIR__ ) . '/site-id.txt';
 	$raw  = is_readable( $file ) ? trim( (string) file_get_contents( $file ) ) : '';
-	// Written by the tool as hex plus an optional "-<n>" reprovision counter;
-	// anything else means a stale or hand-edited file, so stay out of the way.
-	$id = preg_match( '/^[a-f0-9]{4,}(-\d+)?$/', $raw ) ? $raw : '';
+	// Exactly what the tool writes: 8 hex characters plus an optional "-<n>"
+	// reprovision counter. Anything else — truncated, hand-edited, from
+	// another tool — means the prefix would not be the one this site's earlier
+	// orders carry, so stay out of the way rather than stamp a wrong id.
+	$id = preg_match( '/^[a-f0-9]{8}(-\d+)?$/', $raw ) ? $raw : '';
 	return $id;
 }
 

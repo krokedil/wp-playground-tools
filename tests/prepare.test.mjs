@@ -2,13 +2,11 @@
  * Tests for the pure decision helpers in src/prepare.mjs.
  */
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import test from 'node:test';
 import { normalizeConfig } from '../src/config.mjs';
 import {
 	buildLaunchArgs,
 	buildModes,
-	computeSiteHash,
 	decideBlueprint,
 	nodeSatisfiesPin,
 } from '../src/prepare.mjs';
@@ -20,16 +18,6 @@ test('nodeSatisfiesPin accepts only >=20.19', () => {
 	assert.equal(nodeSatisfiesPin('24.18.0'), true);
 	assert.equal(nodeSatisfiesPin('20.18.3'), false);
 	assert.equal(nodeSatisfiesPin('18.20.0'), false);
-});
-
-test('computeSiteHash matches the CLI site key (sha256 of cwd)', () => {
-	// Synthetic fixture: any path works, the function is a pure sha256.
-	const cwd = '/home/dev/plugins/example-plugin/.claude/worktrees/example-1';
-	assert.equal(
-		computeSiteHash(cwd),
-		crypto.createHash('sha256').update(cwd).digest('hex')
-	);
-	assert.match(computeSiteHash(cwd), /^[0-9a-f]{64}$/);
 });
 
 test('decideBlueprint: first run provisions with reset + blueprint', () => {

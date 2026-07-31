@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { tunnelGuardBlocker } from '../src/cli.mjs';
 import { normalizeConfig } from '../src/config.mjs';
+import { deriveSiteId } from '../src/site-id.mjs';
 
 const CLI = fileURLToPath(new URL('../src/cli.mjs', import.meta.url));
 
@@ -106,6 +107,27 @@ test('--version prints the package version on stdout and exits 0', () => {
 	const res = runCli(['--version']);
 	assert.equal(res.status, 0);
 	assert.equal(res.stdout, `${pkg.version}\n`);
+});
+
+test('site-id prints this checkout id on stdout, without a config', (t) => {
+	const root = tmpPlugin(t);
+	const res = runCli(['site-id'], root);
+	assert.equal(res.status, 0);
+	// stdout stays the bare token, so it pipes into other commands; the
+	// human-facing context goes to stderr.
+	assert.match(res.stdout, /^[0-9a-f]{8}\n$/);
+	assert.match(res.stderr, /order numbers on this site read/);
+	// The id keys on process.cwd(), which the OS reports realpath'd — the same
+	// string the Playground CLI hashes for the site directory, so a symlinked
+	// checkout still lands on one identity.
+	assert.equal(res.stdout.trim(), deriveSiteId(fs.realpathSync(root)));
+});
+
+test('site-id exits 1 with guidance for an id nothing has booted', (t) => {
+	const root = tmpPlugin(t);
+	const res = runCli(['site-id', 'ffffffff'], root);
+	assert.equal(res.status, 1);
+	assert.match(res.stderr, /no checkout known for "ffffffff"/);
 });
 
 test('an unknown command prints usage on stderr and exits 1', () => {

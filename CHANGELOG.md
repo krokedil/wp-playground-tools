@@ -23,6 +23,16 @@
   only; order IDs are untouched, so lookups by ID are unaffected. Existing
   persistent sites link the new mu-plugin on their next `--fresh`.
 
+  `krokedil-playground site-id` prints this checkout's id (no config needed, so
+  it answers before a first boot too); `site-id <id>` resolves one back to the
+  checkout that produced it — accepting the prefix exactly as it reads off an
+  order. Every launch upserts `~/.config/krokedil-playground/sites.json` with
+  the checkout's path, slug and the branch **as of that boot**: an id names a
+  path, and a path outlives the branch checked out in it, so recording it at
+  boot is the only way to answer "which branch placed this order" later. The
+  registry is a convenience — an unwritable `$HOME` or CI runner never fails a
+  launch over it.
+
 - Documented the credential-variable naming rule: `<ABBR>_<OPTION>`, where
   `<ABBR>` is the plugin's abbreviation in Krokedil CI's plugin registry,
   uppercased — the same identifier behind `<ABBR>_LOCAL_DIR` and the plugin's
