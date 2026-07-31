@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-07-31
 
 - Order numbers on a playground site are now prefixed with the checkout's
   **site id** (`c345befa-38`), the first 8 characters of the same `sha256(cwd)`
