@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Order numbers on a playground site are now prefixed with the checkout's
+  **site id** (`c345befa-38`), the first 8 characters of the same `sha256(cwd)`
+  digest that keys the persistent site and the wildcard tunnel host. Gateways
+  send the order number to the provider as the order's merchant reference
+  (Qliro's `MerchantReference`, Klarna's `merchant_reference1`) and every fresh
+  site starts at 1, so two checkouts sharing a provider's test merchant
+  collided the moment both placed an order — the provider rejected the second
+  (`Order with reference '38' already exists`) and the purchase failed. Since
+  the prefix is the tunnel host's id, a reference in a provider's portal now
+  names the site that produced it. A `--fresh` renumbers the site from 1 and
+  would re-send references it already used, so each reprovision advances a
+  counter (`c345befa-2-38`); warm boots never move the token, because some
+  gateways compare a stored reference against the order number later.
+
+  Mechanically: a new always-staged `playground-order-prefix.php` mu-plugin
+  filters `woocommerce_order_number` at priority 5 — below plugins that build
+  their own numbers from the parent's, such as returns-and-withdrawals at
+  10000 — reading `.playground/site-id.txt`, and is inert without it. Display
+  only; order IDs are untouched, so lookups by ID are unaffected. Existing
+  persistent sites link the new mu-plugin on their next `--fresh`.
+
 - Documented the credential-variable naming rule: `<ABBR>_<OPTION>`, where
   `<ABBR>` is the plugin's abbreviation in Krokedil CI's plugin registry,
   uppercased — the same identifier behind `<ABBR>_LOCAL_DIR` and the plugin's

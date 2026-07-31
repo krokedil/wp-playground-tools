@@ -210,6 +210,14 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 |---|---|---|
 | *(none — the wildcard covers everything so far)* | | |
 
+## Order numbers are prefixed per checkout
+
+Order numbers on a playground site read `c345befa-38`, not `38`. Gateways send the order number to the provider as the order's merchant reference (Qliro's `MerchantReference`, Klarna's `merchant_reference1`), and every fresh site starts at 1 — so two checkouts sharing a provider's test merchant collide as soon as both place an order, and the provider rejects the second (`Order with reference '38' already exists`), failing the purchase.
+
+The prefix is this checkout's **site id**: the first 8 characters of the same `sha256(cwd)` digest that keys the persistent site and the wildcard tunnel host, so a reference in a provider's portal names the site that produced it — `c345befa-38` came from the checkout serving `…-c345befa.krokedil.ngrok.io`. It is printed at boot. The id is stable for a checkout, which matters because some gateways later compare the stored reference against the order number; `--fresh` is the exception, since the site renumbers from 1 and would re-send references it already used, so each reprovision advances a counter (`c345befa-2-38`).
+
+Mechanically it is display only — a `woocommerce_order_number` filter (priority 5, so plugins that build their own numbers from the parent's still win) fed by `.playground/site-id.txt`. The underlying order ID is untouched, so anything looking an order up by ID is unaffected, and the mu-plugin is inert without that file.
+
 ## Logs / database
 
 Persistent sites live at `~/.wordpress-playground/sites/<sha256(cwd)>/wp-content/`: `debug.log` (development mode enables `WP_DEBUG_LOG`), `uploads/wc-logs/*.log` (WooCommerce logger), and the SQLite database at `database/.ht.sqlite` (open with `sqlite3` or any SQLite GUI — Playground has no MySQL). Ephemeral `server` runs only stream errors to the terminal. `--phpmyadmin` installs a SQLite-adapted phpMyAdmin on any mode.

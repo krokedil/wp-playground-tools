@@ -30,6 +30,7 @@ import { composeAndStage } from './blueprint/compose.mjs';
 import { BLUEPRINT_MODES, MODE_PORT_OFFSETS } from './config.mjs';
 import { PM_COMMANDS, detectPackageManager, execpathMatches } from './pm.mjs';
 import { resolvePort } from './port.mjs';
+import { publishSiteId } from './site-id.mjs';
 
 /** Directory (relative to the plugin root) for generated blueprints/assets. */
 const STAGING_DIR = '.playground';
@@ -526,6 +527,12 @@ export async function launch(root, config, modeName, userArgs) {
 	// data, pre-downloaded plugin zips). Warm boots need the staged mu-plugins
 	// to exist inside the mount too.
 	await composeAndStage(root, config, mode.blueprintMode);
+
+	// Publish the site id the order-prefix mu-plugin stamps on order numbers.
+	// After composeAndStage, so the file lands next to the mu-plugin that
+	// reads it, and before launch so the first request already sees it.
+	const siteId = publishSiteId(root, { provisioning });
+	log(`site id ${siteId} — order numbers read ${siteId}-<n>.`);
 
 	// --fresh is ours, not the CLI's; strip it before forwarding.
 	const forwarded = userArgs.filter((a) => a !== '--fresh');
