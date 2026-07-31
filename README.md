@@ -157,7 +157,7 @@ Requires the `ngrok` binary and an authtoken (`NGROK_AUTHTOKEN` — best set onc
 
 Without a domain the agent binds your account's single default domain, so a second run anywhere collides with `ERR_NGROK_334` — the tool warns when you tunnel that way. Note that omitting the domain does **not** produce a random URL: ngrok's random-URL generation (`--url 'https://'`) is a paid-plan feature and falls back to the default domain when the account lacks it.
 
-**Parallel worktrees**: sites, ports and tunnels are per-worktree automatically — with the wildcard, two checkouts of the same plugin tunnel simultaneously on their own hosts, no flags needed. `--tunnel-domain=<host>` still overrides for one run (it implies `--tunnel`), which is what you want when a provider portal has a fixed URL registered.
+**Parallel worktrees**: sites, ports and tunnels are per-worktree automatically — with the wildcard, two checkouts of the same plugin tunnel simultaneously on their own hosts, no flags needed. `--tunnel-domain=<host>` still overrides for one run (it implies `--tunnel`), which is what you want when a provider portal has a fixed URL registered. `--tunnel-domain=none` ignores the configured domain entirely and lets the provider pick — which means the account's default domain, so it collides with any other run; it exists as an escape hatch, not as the parallel-worktree answer.
 
 #### Tunnel logins need the run password
 

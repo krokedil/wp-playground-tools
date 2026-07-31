@@ -190,6 +190,17 @@ test('expandTunnelDomain: passes non-wildcards through, keeps labels legal', () 
 		}),
 		/^my-plugin-[0-9a-f]{8}\.krokedil\.ngrok\.io$/
 	);
+
+	// A slug that sanitizes away must not leave a leading hyphen, which would
+	// be an illegal label. normalizeConfig rejects such slugs, but this helper
+	// is exported and can't lean on that.
+	assert.match(
+		expandTunnelDomain('*.krokedil.ngrok.io', {
+			slug: '!!!',
+			cwd: '/repos/x',
+		}),
+		/^[0-9a-f]{8}\.krokedil\.ngrok\.io$/
+	);
 });
 
 test('proxy-url file lifecycle: write, read location, clear (idempotent)', (t) => {

@@ -153,9 +153,11 @@ const MAX_LABEL = 63;
  * callback registrations at a payment provider keep working, while a second
  * checkout of the same plugin gets a different host and no collision.
  *
- * The digest is the same `sha256(cwd)` that keys the persistent site, so a
- * site and its public URL share one identity. It is never truncated; a long
- * slug is, since only the digest carries the uniqueness.
+ * The label is `<slug>-<first 8 hex of sha256(cwd)>` — the same digest that
+ * keys the persistent site, so a site and its public URL share one identity.
+ * DNS caps a label at 63 characters; an over-long slug is what gets truncated
+ * to fit, never those 8 digest characters, since they carry the uniqueness. A
+ * slug that sanitizes away to nothing leaves the digest alone as the label.
  *
  * @param {string|null} domain    Wildcard, bare hostname, or null.
  * @param {Object}      opts      Options.
@@ -176,7 +178,10 @@ export function expandTunnelDomain(domain, { slug, cwd }) {
 		.replace(/^-+|-+$/g, '')
 		.slice(0, room)
 		.replace(/-+$/, '');
-	return `${name}-${digest}.${base}`;
+	// `-<digest>` would be an illegal label (leading hyphen). normalizeConfig
+	// rejects a slug that could sanitize away, but this helper is exported and
+	// must not depend on its caller for DNS validity.
+	return name ? `${name}-${digest}.${base}` : `${digest}.${base}`;
 }
 
 /**
