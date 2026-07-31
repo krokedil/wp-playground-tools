@@ -113,7 +113,9 @@ export default {
 };
 ```
 
-**Naming**: `<ABBR>_<OPTION>`, where `<ABBR>` is the plugin's abbreviation in Krokedil CI's plugin registry (`repos.json`), uppercased — the same identifier behind `<ABBR>_LOCAL_DIR` and the plugin's GitHub secret names (`kp` → `KP_TEST_MERCHANT_ID_SE`). Reuse the plugin's existing abbreviation instead of inventing a prefix: one central file serves every plugin, so prefixes must not collide, and identical names mean the local file and the CI secrets line up 1:1. Market/region suffixes go last (`_SE`, `_EU`). The [port registry](#port-registry) lists the abbreviations of the plugins onboarded so far.
+**Naming**: `<ABBR>_<OPTION>`, where `<ABBR>` is the plugin's abbreviation uppercased — the same identifier behind `<ABBR>_LOCAL_DIR` and the plugin's GitHub secret names (`kp` → `KP_TEST_MERCHANT_ID_SE`). Reuse the plugin's existing abbreviation instead of inventing a prefix: one central file serves every plugin, so prefixes must not collide, and identical names mean the local file and the CI secrets line up 1:1. Market/region suffixes go last (`_SE`, `_EU`).
+
+Abbreviations are assigned in the plugin registry (`repos.json`) in Krokedil's internal CI repo — **not in this repository**. Without access to it, the [port registry](#port-registry) below lists the abbreviations of the plugins onboarded so far; outside Krokedil, any short prefix works as long as it's one per plugin and stays stable.
 
 **Locally — the central file**: keep the values in `~/.config/krokedil-playground/.env`, one file shared by every plugin checkout and worktree (`NAME=value`; quotes, multi-line quoted values and `export` prefixes work). Seed it from the committed [`credentials.env.example`](credentials.env.example), or run `pnpm exec krokedil-playground credentials` in a plugin repo — it scans that plugin's config for `envSecret()` names and appends commented stubs for anything the file lacks (`init` does the same during onboarding). The tool loads the file before evaluating the config and never stores or prints values — warnings name variables only.
 
@@ -184,7 +186,7 @@ Playground's PHP-in-WASM has no mail transport (no sendmail binary or MTA), so P
 
 ## Port registry
 
-Give each plugin a distinct `basePort` so concurrent plugin development doesn't rely on probing. Claim a row when you onboard a plugin — `Abbr` is the plugin's Krokedil CI abbreviation, which is also the prefix for its [credential variables](#private-options-api-keys), so claim both in the same PR:
+Give each plugin a distinct `basePort` so concurrent plugin development doesn't rely on probing. Claim a row when you onboard a plugin — `Abbr` is the plugin's Krokedil CI abbreviation, and uppercased it prefixes its [credential variables](#private-options-api-keys) (`kp` → `KP_TEST_MERCHANT_ID_SE`), so claim both in the same PR:
 
 | basePort | Abbr | Plugin |
 |---|---|---|
