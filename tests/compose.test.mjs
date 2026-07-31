@@ -225,6 +225,16 @@ test('every mode links the tunnel guard (--tunnel is a per-run flag)', () => {
 	}
 });
 
+test('every mode links the order prefix (any mode can place an order)', () => {
+	for (const mode of ['development', 'demo', 'e2e']) {
+		const code = JSON.stringify(composeBlueprint(rwwcConfig, mode).steps);
+		assert.ok(
+			code.includes('playground-order-prefix.php'),
+			`missing order prefix link in ${mode}`
+		);
+	}
+});
+
 test('extraSteps are appended verbatim at the end', () => {
 	const config = normalizeConfig({
 		slug: 'a-plugin',
@@ -307,6 +317,7 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 	for (const staged of [
 		'mu-plugins/playground-proxy-url.php',
 		'mu-plugins/playground-tunnel-guard.php',
+		'mu-plugins/playground-order-prefix.php',
 		'mu-plugins/playground-dev-login.php',
 		'mu-plugins/playground-seeder.php',
 		'mu-plugins/my-helper.php',

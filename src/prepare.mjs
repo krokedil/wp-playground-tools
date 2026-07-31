@@ -19,7 +19,6 @@
  * installs node_modules if missing and then imports "./cli".
  */
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -30,6 +29,7 @@ import { composeAndStage } from './blueprint/compose.mjs';
 import { BLUEPRINT_MODES, MODE_PORT_OFFSETS } from './config.mjs';
 import { PM_COMMANDS, detectPackageManager, execpathMatches } from './pm.mjs';
 import { resolvePort } from './port.mjs';
+import { computeSiteHash, publishSiteId, recordSiteId } from './site-id.mjs';
 
 /** Directory (relative to the plugin root) for generated blueprints/assets. */
 const STAGING_DIR = '.playground';
@@ -58,16 +58,6 @@ const REASON_MESSAGES = {
 export function nodeSatisfiesPin(version) {
 	const [major, minor] = version.split('.').map(Number);
 	return major > 20 || (major === 20 && minor >= 19);
-}
-
-/**
- * Compute the persistent-site directory key the CLI uses: sha256 of the cwd.
- *
- * @param {string} cwd Working directory the CLI is launched from.
- * @return {string} Lowercase hex sha256 digest.
- */
-export function computeSiteHash(cwd) {
-	return crypto.createHash('sha256').update(cwd).digest('hex');
 }
 
 /**
@@ -526,6 +516,13 @@ export async function launch(root, config, modeName, userArgs) {
 	// data, pre-downloaded plugin zips). Warm boots need the staged mu-plugins
 	// to exist inside the mount too.
 	await composeAndStage(root, config, mode.blueprintMode);
+
+	// Publish the site id the order-prefix mu-plugin stamps on order numbers.
+	// After composeAndStage, so the file lands next to the mu-plugin that
+	// reads it, and before launch so the first request already sees it.
+	const siteId = publishSiteId(root, { provisioning });
+	recordSiteId(root, siteId, { slug: config.slug });
+	log(`site id ${siteId} — order numbers read ${siteId}-<n>.`);
 
 	// --fresh is ours, not the CLI's; strip it before forwarding.
 	const forwarded = userArgs.filter((a) => a !== '--fresh');

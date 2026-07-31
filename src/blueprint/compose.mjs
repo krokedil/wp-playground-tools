@@ -56,6 +56,17 @@ function muPluginFiles(config, mode) {
 				'playground-tunnel-guard.php'
 			),
 		},
+		{
+			// Every mode: any of them can place an order against a provider's
+			// shared test merchant, where a bare order number collides with
+			// every other checkout's.
+			name: 'playground-order-prefix.php',
+			source: path.join(
+				ASSETS_DIR,
+				'mu-plugins',
+				'playground-order-prefix.php'
+			),
+		},
 	];
 	if (mode === 'development') {
 		// wp-login.php auto-submits as admin. The CLI's own login is disabled
