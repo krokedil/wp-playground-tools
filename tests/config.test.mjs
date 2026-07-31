@@ -101,6 +101,10 @@ test('tunnel.domain must be a bare hostname', () => {
 		'x.eu.ngrok.io/path',
 		'x.eu.ngrok.io:443',
 		'not a host',
+		'*',
+		'*.',
+		'*x.ngrok.io',
+		'a.*.ngrok.io',
 		123,
 		'',
 	]) {
@@ -129,6 +133,11 @@ test('validateTunnelDomain accepts hostnames and names the failing setting', () 
 		'my-plugin.eu.ngrok.io'
 	);
 	assert.equal(validateTunnelDomain('a-b.ngrok.app'), 'a-b.ngrok.app');
+	// A wildcard reservation is the per-worktree case, not a typo.
+	assert.equal(
+		validateTunnelDomain('*.krokedil.ngrok.io'),
+		'*.krokedil.ngrok.io'
+	);
 	assert.throws(
 		() => validateTunnelDomain('nodots', '--tunnel-domain'),
 		/"--tunnel-domain" must be a bare hostname/

@@ -45,12 +45,13 @@ export default {
 	// PR screenshot manifest (omit to disable `screenshots`).
 	// screenshots: './tools/shots.config.mjs',
 
-	// For --tunnel: reserve a stable domain per plugin under the company ngrok
-	// pay-as-you-go account (dashboard.ngrok.com/domains) and claim it in the
-	// tunnel domain registry table (shared README) — stable webhook callbacks
-	// depend on it. Parallel worktrees: override per run with
-	// --tunnel-domain=<second-reserved-domain|none>.
-	// tunnel: { provider: 'ngrok', domain: 'my-plugin.eu.ngrok.io' },
+	// For --tunnel: the company wildcard. Each worktree gets its own derived,
+	// stable host under it (<slug>-<hash of the checkout path>), so parallel
+	// worktrees tunnel at once and webhook callbacks keep working. A bare
+	// hostname pins every worktree to one URL — only for a provider portal
+	// that stores a fixed callback URL; claim that one in the tunnel domain
+	// registry (shared README). Per-run override: --tunnel-domain=<host>.
+	// tunnel: { provider: 'ngrok', domain: '*.krokedil.ngrok.io' },
 
 	// For --https: the mkcert SAN list. Replaces the default ['localhost'] —
 	// keep 'localhost' in the list if you still browse there; the first entry

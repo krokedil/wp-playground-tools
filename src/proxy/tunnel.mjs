@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+import { computeSiteHash } from '../prepare.mjs';
 import { writeRuntimeReadable } from '../runtime-file.mjs';
 
 /** Registered tunnel providers. cloudflared etc. are later drop-ins. */
@@ -124,18 +125,63 @@ export function resolveTunnelPassword({ env = process.env } = {}) {
  * Resolve the tunnel domain a run should serve.
  *
  * A per-run --tunnel-domain override wins over config.tunnel.domain: parallel
- * worktrees share the same committed config, so a second instance needs its
- * own reserved domain — or 'none' for an ephemeral URL. Exported for tests.
+ * worktrees share the same committed config, so a second instance can point
+ * itself elsewhere — or pass 'none' to let the provider choose. Exported for
+ * tests.
  *
  * @param {Object}      config         Normalized plugin config.
- * @param {string|null} [tunnelDomain] Per-run override ('none' forces ephemeral).
- * @return {string|null} The domain to serve, or null for an ephemeral URL.
+ * @param {string|null} [tunnelDomain] Per-run override ('none' = provider default).
+ * @return {string|null} The domain to serve, or null for the provider default.
  */
 export function resolveTunnelDomain(config, tunnelDomain = null) {
 	if (tunnelDomain === 'none') {
 		return null;
 	}
 	return tunnelDomain ?? config.tunnel?.domain ?? null;
+}
+
+/** Longest a single DNS label may be. */
+const MAX_LABEL = 63;
+
+/**
+ * Expand a wildcard tunnel domain into this worktree's own hostname.
+ *
+ * A wildcard reservation (`*.krokedil.ngrok.io`) serves any single-label
+ * subdomain without reserving it first, which is what lets parallel worktrees
+ * tunnel at the same time: one reservation, a hostname per checkout. The label
+ * is derived rather than random — same worktree, same URL on every run — so
+ * callback registrations at a payment provider keep working, while a second
+ * checkout of the same plugin gets a different host and no collision.
+ *
+ * The label is `<slug>-<first 8 hex of sha256(cwd)>` — the same digest that
+ * keys the persistent site, so a site and its public URL share one identity.
+ * DNS caps a label at 63 characters; an over-long slug is what gets truncated
+ * to fit, never those 8 digest characters, since they carry the uniqueness. A
+ * slug that sanitizes away to nothing leaves the digest alone as the label.
+ *
+ * @param {string|null} domain    Wildcard, bare hostname, or null.
+ * @param {Object}      opts      Options.
+ * @param {string}      opts.slug Plugin slug.
+ * @param {string}      opts.cwd  Plugin root (the site's identity).
+ * @return {string|null} A concrete hostname, or the input unchanged.
+ */
+export function expandTunnelDomain(domain, { slug, cwd }) {
+	if (!domain?.startsWith('*.')) {
+		return domain ?? null;
+	}
+	const base = domain.slice(2);
+	const digest = computeSiteHash(cwd).slice(0, 8);
+	const room = MAX_LABEL - digest.length - 1;
+	const name = slug
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, room)
+		.replace(/-+$/, '');
+	// `-<digest>` would be an illegal label (leading hyphen). normalizeConfig
+	// rejects a slug that could sanitize away, but this helper is exported and
+	// must not depend on its caller for DNS validity.
+	return name ? `${name}-${digest}.${base}` : `${digest}.${base}`;
 }
 
 /**
@@ -180,7 +226,11 @@ export async function startProxy(
 			);
 		}
 		const { startTunnel } = await load();
-		const domain = resolveTunnelDomain(config, tunnelDomain);
+		const requested = resolveTunnelDomain(config, tunnelDomain);
+		const domain = expandTunnelDomain(requested, {
+			slug: config.slug,
+			cwd: root,
+		});
 
 		// Arm the guard mu-plugin *before* the tunnel exists — the password
 		// doesn't depend on the URL, and there must be no window in which the
@@ -199,12 +249,14 @@ export async function startProxy(
 
 		if (!domain) {
 			process.stderr.write(
-				tunnelDomain === 'none'
-					? '⚠ playground: ephemeral tunnel (--tunnel-domain=none) — webhook ' +
-							'registrations at your payment provider will target this run’s random URL.\n'
-					: '⚠ playground: tunneling without a reserved domain — this URL changes on every run, ' +
-							'so webhook registrations at your payment provider will go stale. ' +
-							'Set config.tunnel.domain to a reserved ngrok domain for stable callbacks.\n'
+				'⚠ playground: tunneling without a domain — the provider picks the URL, ' +
+					'and with one account-wide default domain a second worktree collides with this run. ' +
+					'Set config.tunnel.domain to a wildcard like "*.krokedil.ngrok.io" for a stable ' +
+					'per-worktree URL.\n'
+			);
+		} else if (requested !== domain) {
+			process.stderr.write(
+				`▶ playground: tunnel host ${domain} (derived from ${requested} — stable for this worktree).\n`
 			);
 		}
 	}

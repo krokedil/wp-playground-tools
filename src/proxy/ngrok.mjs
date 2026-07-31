@@ -86,9 +86,12 @@ const NGROK_ERROR_HINTS = {
 		'Authenticate with the Krokedil pay-as-you-go token and verify the domain at ' +
 		'dashboard.ngrok.com/domains (see the tunnel domain registry in the shared README).',
 	ERR_NGROK_334:
-		'This tunnel domain is already online — another worktree (yours or a teammate’s) ' +
-		'is serving it. Rerun with --tunnel-domain=none for an ephemeral URL, or use a ' +
-		'second reserved domain via --tunnel-domain=<domain>.',
+		'This tunnel URL is already online — another worktree (yours or a teammate’s) ' +
+		'is serving it. Set config.tunnel.domain to a wildcard like "*.krokedil.ngrok.io" ' +
+		'so every worktree derives its own host, or point this run elsewhere with ' +
+		'--tunnel-domain=<domain>. Note that dropping the domain does NOT give a random ' +
+		'URL: without one the agent binds the account’s single default domain, which is ' +
+		'how two runs end up here.',
 };
 
 /**
@@ -174,8 +177,10 @@ async function pollApi(deadline) {
  *
  * @param {Object}      opts        Options.
  * @param {number}      opts.port   Local port to expose.
- * @param {string|null} opts.domain Reserved domain to serve, or null for an
- *                                  ephemeral random URL.
+ * @param {string|null} opts.domain Concrete hostname to serve (wildcards are
+ *                                  expanded by the caller), or null to let the
+ *                                  agent pick — which binds the account's
+ *                                  default domain, not a random URL.
  * @return {Promise<{url: string, stop: Function}>} The running tunnel.
  */
 export async function startTunnel({ port, domain = null }) {
