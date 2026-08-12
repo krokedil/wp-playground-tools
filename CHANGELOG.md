@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Bootstrap shim v3: the install-failure message no longer says "install
+  \<manager\> and retry" when the manager is present and the install itself
+  failed (network, auth, integrity, peer deps). A spawn error (manager not on
+  PATH / not executable) now bails immediately with an "install \<manager\>"
+  hint — retrying a missing binary was pointless — while a non-zero exit
+  reports the exit code and points at the install output above, which already
+  says why. A signal-terminated install (OOM kill, external kill) is likewise
+  reported as such instead of falling through as "exit null", and is not
+  retried. Consumers pick the new shim up with `init --update`. (Copilot
+  review on klarna-payments-for-woocommerce PR 589.)
+
 ## 1.3.0 — 2026-07-31
 
 - Order numbers on a playground site are now prefixed with the checkout's
