@@ -8,7 +8,9 @@
   PATH / not executable) now bails immediately with an "install \<manager\>"
   hint — retrying a missing binary was pointless — while a non-zero exit
   reports the exit code and points at the install output above, which already
-  says why. Consumers pick the new shim up with `init --update`. (Copilot
+  says why. A signal-terminated install (OOM kill, external kill) is likewise
+  reported as such instead of falling through as "exit null", and is not
+  retried. Consumers pick the new shim up with `init --update`. (Copilot
   review on klarna-payments-for-woocommerce PR 589.)
 
 ## 1.3.0 — 2026-07-31

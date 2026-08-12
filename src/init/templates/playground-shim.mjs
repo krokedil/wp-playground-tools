@@ -63,22 +63,33 @@ if ( ! fs.existsSync( path.join( ROOT, 'node_modules', PKG ) ) ) {
 			: spawnSync( manager, args, { cwd: ROOT, stdio: 'inherit' } );
 	};
 	// A spawn error means the manager itself couldn't run (not on PATH, not
-	// executable) — retrying or blaming the install would mislead; a non-zero
+	// executable) and a signal means something killed it (OOM, external kill) —
+	// in both cases retrying or blaming the install would mislead; a non-zero
 	// exit means the manager ran and the install output already says why.
 	const notFound = ( err ) => {
 		const url = manager === 'pnpm' ? 'https://pnpm.io' : 'https://nodejs.org';
 		process.stderr.write( `✖ playground: could not run ${ manager } (${ err.message }) — install ${ manager } (${ url }) and retry.\n` );
 		process.exit( 1 );
 	};
+	const killed = ( signal ) => {
+		process.stderr.write( `✖ playground: ${ manager } install was terminated (signal ${ signal }) — retry; check for OOM or an external kill.\n` );
+		process.exit( 1 );
+	};
 	const strict = run( install );
 	if ( strict.error ) {
 		notFound( strict.error );
+	}
+	if ( strict.signal ) {
+		killed( strict.signal );
 	}
 	if ( strict.status !== 0 ) {
 		process.stderr.write( '▶ playground: lockfile not usable as-is; running a normal install…\n' );
 		const res = run( fallback );
 		if ( res.error ) {
 			notFound( res.error );
+		}
+		if ( res.signal ) {
+			killed( res.signal );
 		}
 		if ( res.status !== 0 ) {
 			process.stderr.write( `✖ playground: ${ manager } install failed (exit ${ res.status }) — see the install output above.\n` );
