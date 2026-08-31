@@ -109,6 +109,11 @@ test('scaffold writes shim, config, pins, scripts, launch entries and ignores', 
 	);
 	assert.match(kernlignore, /^playground\.config\.mjs$/m);
 	assert.match(kernlignore, /^\.env$/m);
+	assert.match(kernlignore, /^tools\/playground\.mjs$/m);
+	assert.match(kernlignore, /^CLAUDE\.md$/m);
+	assert.match(kernlignore, /^\.nvmrc$/m);
+	assert.match(kernlignore, /^\.claude$/m);
+	assert.match(kernlignore, /^\.claude\/\*\*\/\*$/m);
 
 	const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
 	assert.ok(
