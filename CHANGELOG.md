@@ -27,8 +27,12 @@
 - Registry bookkeeping for onboarding paytrail-for-woocommerce: `basePort` 8920
   claimed in the port registry with abbreviation `paytrail`, and the plugin's
   `PAYTRAIL_TEST_MERCHANT_ID` / `PAYTRAIL_TEST_SECRET_KEY` names documented in
-  `credentials.env.example`. The example `basePort` in the scaffolded config
-  and the README schema block move to 8930, the registry's new free row.
+  `credentials.env.example`.
+- Registry bookkeeping for onboarding partial-delivery-for-woocommerce:
+  `basePort` 8930 claimed in the port registry with abbreviation `wpd` (no
+  credentials — the plugin talks to no external API). The example `basePort`
+  in the scaffolded config and the README schema block move to 8940, the
+  registry's new free row.
 
 ## 1.3.0 — 2026-07-31
 
