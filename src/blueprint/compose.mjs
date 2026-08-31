@@ -200,6 +200,9 @@ const ZIP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Below this a "zip" is an error page or a truncated write, not a plugin. */
 const MIN_ZIP_BYTES = 1000;
 
+/** How long a cached "is a WP beta offered right now" answer stays fresh. */
+const BETA_CHECK_TTL_MS = 6 * 60 * 60 * 1000;
+
 /**
  * Host-side download cache for wordpress.org zips (overridable for tests).
  *
@@ -254,6 +257,59 @@ async function fetchToFile(url, dest, attempts = 3) {
 		}
 	}
 	throw lastError;
+}
+
+/**
+ * Whether wordpress.org currently offers a beta/RC build. Between a final
+ * release and the next beta cycle it offers none, and the Playground CLI's
+ * 'beta' resolver then falls through to wordpress.org/wordpress-beta.zip —
+ * a 404 whose body it saves and tries to unzip, failing every cold boot with
+ * "Could not unzip file. Error code: 19. File size: 18 bytes." The check
+ * mirrors the CLI's own resolution (autoupdate offers whose version contains
+ * "beta" or "RC") and caches the answer (TTL above) next to the plugin zips.
+ *
+ * @return {Promise<boolean|null>} Whether a beta/RC is offered, or null when
+ * the API was unreachable and no fresh cached answer exists.
+ */
+async function wpBetaOffered() {
+	const cacheDir = zipCacheDir();
+	const cached = path.join(cacheDir, 'wp-beta-check.json');
+	if (
+		fs.existsSync(cached) &&
+		Date.now() - fs.statSync(cached).mtimeMs < BETA_CHECK_TTL_MS
+	) {
+		try {
+			const answer = JSON.parse(
+				fs.readFileSync(cached, 'utf8')
+			).betaOffered;
+			if (typeof answer === 'boolean') {
+				return answer;
+			}
+		} catch {
+			// Unreadable cache entry — fall through to a re-fetch.
+		}
+	}
+	try {
+		const res = await fetch(
+			'https://api.wordpress.org/core/version-check/1.7/?channel=beta',
+			{ signal: AbortSignal.timeout(10000), redirect: 'follow' }
+		);
+		if (!res.ok) {
+			throw new Error(`HTTP ${res.status}`);
+		}
+		const offers = (await res.json())?.offers ?? [];
+		const betaOffered = offers.some(
+			(o) =>
+				o?.response === 'autoupdate' &&
+				(String(o?.version ?? '').includes('beta') ||
+					String(o?.version ?? '').includes('RC'))
+		);
+		fs.mkdirSync(cacheDir, { recursive: true });
+		fs.writeFileSync(cached, JSON.stringify({ betaOffered }) + '\n');
+		return betaOffered;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -358,6 +414,22 @@ export async function composeAndStage(root, config, mode) {
 	}
 
 	const blueprint = composeBlueprint(config, mode);
+	if (blueprint.preferredVersions.wp === 'beta') {
+		// See wpBetaOffered: 'beta' with no live beta cycle bricks
+		// provisioning, so fall back to latest — at that point the freshly
+		// released version *is* what the beta was previewing.
+		const offered = await wpBetaOffered();
+		if (offered === false) {
+			blueprint.preferredVersions.wp = 'latest';
+			process.stderr.write(
+				'▶ playground: no WordPress beta/RC is offered right now — using latest instead.\n'
+			);
+		} else if (offered === null) {
+			process.stderr.write(
+				'▶ playground: could not check whether a WordPress beta exists (offline?) — keeping wp "beta".\n'
+			);
+		}
+	}
 	await stagePluginZips(root, config, blueprint);
 
 	// Plain write: the blueprint is consumed by the host CLI process that wrote

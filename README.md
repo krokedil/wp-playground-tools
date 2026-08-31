@@ -71,6 +71,7 @@ export default {
 	basePort: 8920,                          // start; modes get +1/+2/+3 — see the port registry below
 	php: '8.3',
 	wp: null,                                // string for all modes, or { development, demo, e2e }; default beta/latest/beta
+	                                         // ('beta' falls back to latest between WP beta cycles, when none is offered)
 	composer: { markers: ['vendor/autoload.php'] },        // default when composer.json exists; add
 	                                         // 'dependencies/autoload.php' for wpify-scoper plugins; null = skip
 	build: { markers: ['build/index.asset.php'], command: 'build' }, // omit for plugins without a JS build

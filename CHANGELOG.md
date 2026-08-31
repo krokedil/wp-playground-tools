@@ -12,6 +12,18 @@
   reported as such instead of falling through as "exit null", and is not
   retried. Consumers pick the new shim up with `init --update`. (Copilot
   review on klarna-payments-for-woocommerce PR 589.)
+- A `wp` of `beta` (the development/e2e default) now falls back to `latest`
+  when wordpress.org offers no beta/RC build — the window between a final
+  release and the next beta cycle. The Playground CLI resolves `beta` by
+  scanning the version-check offers and, finding none, falls through to
+  `wordpress.org/wordpress-beta.zip`: a 404 whose 18-byte body it saves and
+  tries to unzip, so every cold development boot died with "Could not unzip
+  file. Error code: 19. File size: 18 bytes." (first seen when WP 7.1 shipped
+  on 2026-08-19 and the 7.1 betas disappeared; it took the CI smoke job with
+  it). The check asks the same version-check API the CLI uses, caches the
+  answer for 6 hours next to the plugin-zip cache, and keeps `beta` with a
+  warning when the API is unreachable. An explicit `wp` version is never
+  second-guessed.
 
 ## 1.3.0 — 2026-07-31
 
