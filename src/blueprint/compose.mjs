@@ -305,7 +305,13 @@ async function wpBetaOffered() {
 					String(o?.version ?? '').includes('RC'))
 		);
 		fs.mkdirSync(cacheDir, { recursive: true });
-		fs.writeFileSync(cached, JSON.stringify({ betaOffered }) + '\n');
+		// Temp file + rename, like fetchToFile: an interrupted write must not
+		// leave a truncated entry that the freshness check accepts.
+		fs.writeFileSync(
+			`${cached}.part`,
+			JSON.stringify({ betaOffered }) + '\n'
+		);
+		fs.renameSync(`${cached}.part`, cached);
 		return betaOffered;
 	} catch {
 		return null;
