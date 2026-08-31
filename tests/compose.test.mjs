@@ -283,6 +283,11 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 		]) {
 			fs.writeFileSync(path.join(cache, `${slug}.zip`), 'x'.repeat(2000));
 		}
+		// Pre-seed the beta-availability answer too, for the same reason.
+		fs.writeFileSync(
+			path.join(cache, 'wp-beta-check.json'),
+			'{"betaOffered":true}\n'
+		);
 
 		// A plugin-local mu-plugin + seed data to stage.
 		fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
@@ -358,6 +363,63 @@ test('composeAndStage writes the blueprint and stages assets', async (t) => {
 			/^\/wordpress\/wp-content\/plugins\/a-plugin\/\.playground\/plugins\/[a-z-]+\.zip$/
 		);
 	}
+});
+
+test('composeAndStage falls back to wp latest when no beta is offered', async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-compose-'));
+	const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-cache-'));
+	process.env.KROKEDIL_PG_CACHE_DIR = cache;
+	t.after(() => {
+		delete process.env.KROKEDIL_PG_CACHE_DIR;
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(cache, { recursive: true, force: true });
+	});
+	for (const slug of [
+		'woocommerce',
+		'query-monitor',
+		'show-hidden-post-meta',
+		'transients-manager',
+		'wp-mail-logging',
+	]) {
+		fs.writeFileSync(path.join(cache, `${slug}.zip`), 'x'.repeat(2000));
+	}
+	const config = normalizeConfig({ slug: 'a-plugin' });
+	const stagedWp = () =>
+		JSON.parse(
+			fs.readFileSync(
+				path.join(root, '.playground', 'blueprint.development.json'),
+				'utf8'
+			)
+		).preferredVersions.wp;
+
+	// Between beta cycles the Playground CLI resolves 'beta' to a 404 page it
+	// then fails to unzip, so the staged blueprint must ask for latest.
+	fs.writeFileSync(
+		path.join(cache, 'wp-beta-check.json'),
+		'{"betaOffered":false}\n'
+	);
+	await composeAndStage(root, config, 'development');
+	assert.equal(stagedWp(), 'latest');
+
+	// A live beta cycle keeps the documented development default.
+	fs.writeFileSync(
+		path.join(cache, 'wp-beta-check.json'),
+		'{"betaOffered":true}\n'
+	);
+	await composeAndStage(root, config, 'development');
+	assert.equal(stagedWp(), 'beta');
+
+	// An explicit wp version is never second-guessed.
+	fs.writeFileSync(
+		path.join(cache, 'wp-beta-check.json'),
+		'{"betaOffered":false}\n'
+	);
+	await composeAndStage(
+		root,
+		normalizeConfig({ slug: 'a-plugin', wp: '6.8' }),
+		'development'
+	);
+	assert.equal(stagedWp(), '6.8');
 });
 
 test('composeAndStage fails actionably on a missing mu-plugin', async (t) => {
