@@ -201,7 +201,8 @@ Give each plugin a distinct `basePort` so concurrent plugin development doesn't 
 | 8910 | `kco` | klarna-checkout-for-woocommerce |
 | 8920 | `paytrail` | paytrail-for-woocommerce |
 | 8930 | `wpd` | partial-delivery-for-woocommerce |
-| 8940 | | *(next plugin here)* |
+| 8940 | `cargonizer` | cargonizer-connect |
+| 8950 | | *(next plugin here)* |
 | 9880 | — | *(reserved: this repo's `sandbox/` dogfooding plugin)* |
 
 8880 is also the tool's fallback when `basePort` is unset (returns-and-withdrawals claims it explicitly) — never rely on the fallback; the tool warns on every run until `basePort` is set.
