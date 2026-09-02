@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 — 2026-09-02
 
 - `init` now appends the whole committed scaffold to `.kernlignore`
   (`tools/playground.mjs`, `CLAUDE.md`, `.nvmrc`, `.claude` + `.claude/**/*`),
