@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `init` now appends the whole committed scaffold to `.kernlignore`
+  (`tools/playground.mjs`, `CLAUDE.md`, `.nvmrc`, `.claude` + `.claude/**/*`),
+  not just `.playground`/`playground.config.mjs`/`.env` — Kernl packages
+  release ZIPs by that file, so on Kernl-distributed plugins the scaffold
+  would otherwise ship in the plugin ZIP (Copilot review on
+  partial-delivery-for-woocommerce PR 43). Already-onboarded plugins get the
+  entries by rerunning `init --update` (or `init`); `ensureLines` only adds
+  what is missing.
 - Bootstrap shim v3: the install-failure message no longer says "install
   \<manager\> and retry" when the manager is present and the install itself
   failed (network, auth, integrity, peer deps). A spawn error (manager not on

@@ -427,6 +427,13 @@ export async function scaffold(root, args, { credentials = {} } = {}) {
 				'.playground/**/*',
 				'playground.config.mjs',
 				'.env',
+				// The committed scaffold is development-only too — Kernl
+				// packages release ZIPs by this file, so exclude all of it.
+				'tools/playground.mjs',
+				'CLAUDE.md',
+				'.nvmrc',
+				'.claude',
+				'.claude/**/*',
 			])
 		) {
 			log('appended .kernlignore entries');
