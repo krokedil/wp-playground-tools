@@ -40,7 +40,13 @@
   `basePort` 8930 claimed in the port registry with abbreviation `wpd` (no
   credentials — the plugin talks to no external API). The example `basePort`
   in the scaffolded config and the README schema block move to 8940, the
-  registry's new free row.
+  registry's next free row at the time.
+- Registry bookkeeping for onboarding cargonizer-connect: `basePort` 8940
+  claimed in the port registry with abbreviation `cargonizer`, and the plugin's
+  `CARGONIZER_TEST_API_KEY` / `CARGONIZER_TEST_SENDER_ID` /
+  `CARGONIZER_TEST_PROFILE_ID` names documented in `credentials.env.example`.
+  The example `basePort` in the scaffolded config and the README schema block
+  move on to 8950, the registry's new free row.
 
 ## 1.3.0 — 2026-07-31
 
