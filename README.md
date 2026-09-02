@@ -68,7 +68,7 @@ export default {
 	siteName: 'My Plugin',                   // default: title-cased slug
 	siteTagline: null,                       // default: "<Mode> by Krokedil"
 	landingPage: '/wp-admin/',               // development-mode landing page (demo/e2e always land on plugins.php)
-	basePort: 8940,                          // start; modes get +1/+2/+3 — see the port registry below
+	basePort: 8950,                          // start; modes get +1/+2/+3 — see the port registry below
 	php: '8.3',
 	wp: null,                                // string for all modes, or { development, demo, e2e }; default beta/latest/beta
 	                                         // ('beta' falls back to latest between WP beta cycles, when none is offered)
