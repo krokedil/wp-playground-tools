@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Registry bookkeeping for onboarding instabox-for-woocommerce: `basePort`
+  8950 claimed in the port registry with abbreviation `instabox`, and the
+  plugin's `INSTABOX_API_KEY` / `INSTABOX_API_SECRET` /
+  `INSTABOX_CUSTOMER_NUMBER` names documented in `credentials.env.example`.
+  The example `basePort` in the scaffolded config and the README schema block
+  move to 8960, the registry's next free row at the time.
+
 ## 1.4.0 — 2026-09-02
 
 - `init` now appends the whole committed scaffold to `.kernlignore`
