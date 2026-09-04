@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Registry bookkeeping for onboarding dintero-checkout-for-woocommerce:
+  `basePort` 8960 claimed in the port registry with abbreviation `dintero`,
+  and the `DINTERO_TEST_*` credential names added to
+  `credentials.env.example`.
+
 ## 1.4.1 — 2026-09-04
 
 - `init` now appends the package-manager files to `.kernlignore`
