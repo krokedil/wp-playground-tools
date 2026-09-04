@@ -13,7 +13,7 @@ export default {
 	// tool warns and falls back to 8880 — a port another plugin already
 	// claims. Modes listen on basePort (start), +1 (development), +2 (demo),
 	// +3 (e2e); --https proxies on the live port +400.
-	// basePort: 8960,
+	// basePort: 8970,
 
 	// Modes this plugin uses (default shown). Add 'e2e' for the e2e blueprint,
 	// then run `init --update` to regenerate scripts and launch entries.
