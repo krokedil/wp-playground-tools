@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.1 — 2026-09-04
 
 - `init` now appends the package-manager files to `.kernlignore`
   (`package.json`, `package-lock.json`, `pnpm-lock.yaml`, `.npmrc`,
