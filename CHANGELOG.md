@@ -11,9 +11,6 @@
   on instabox-for-woocommerce PR 62). Already-onboarded plugins get the
   entries by rerunning `init --update`; lines already present are left
   alone.
-
-## Unreleased
-
 - Registry bookkeeping for onboarding instabox-for-woocommerce: `basePort`
   8950 claimed in the port registry with abbreviation `instabox`, and the
   plugin's `INSTABOX_API_KEY` / `INSTABOX_API_SECRET` /
