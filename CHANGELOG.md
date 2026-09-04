@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- `init` now appends the package-manager files to `.kernlignore`
+  (`package.json`, `package-lock.json`, `pnpm-lock.yaml`, `.npmrc`,
+  `node_modules` + `node_modules/**/*`): kernl-release has no default
+  excludes and the Kernl deploy workflow installs node_modules before
+  zipping, so on a plugin whose `.kernlignore` predates npm tooling the
+  lockfile and node_modules shipped in the release ZIP (Copilot review
+  on instabox-for-woocommerce PR 62). Already-onboarded plugins get the
+  entries by rerunning `init --update`; lines already present are left
+  alone.
 - Registry bookkeeping for onboarding instabox-for-woocommerce: `basePort`
   8950 claimed in the port registry with abbreviation `instabox`, and the
   plugin's `INSTABOX_API_KEY` / `INSTABOX_API_SECRET` /

@@ -434,6 +434,19 @@ export async function scaffold(root, args, { credentials = {} } = {}) {
 				'.nvmrc',
 				'.claude',
 				'.claude/**/*',
+				// Package-manager files: kernl-release has no default excludes
+				// (it globs everything minus this file's entries), and the Kernl
+				// deploy workflow installs node_modules before zipping — without
+				// these lines the lockfile and node_modules ship in the plugin
+				// ZIP (Copilot review on instabox-for-woocommerce PR 62). Both
+				// lockfiles are listed unconditionally: a name that matches no
+				// file is harmless, and ensureLines skips lines already present.
+				'package.json',
+				'package-lock.json',
+				'pnpm-lock.yaml',
+				'.npmrc',
+				'node_modules',
+				'node_modules/**/*',
 			])
 		) {
 			log('appended .kernlignore entries');

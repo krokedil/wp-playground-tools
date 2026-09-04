@@ -114,6 +114,14 @@ test('scaffold writes shim, config, pins, scripts, launch entries and ignores', 
 	assert.match(kernlignore, /^\.nvmrc$/m);
 	assert.match(kernlignore, /^\.claude$/m);
 	assert.match(kernlignore, /^\.claude\/\*\*\/\*$/m);
+	assert.match(kernlignore, /^package\.json$/m);
+	assert.match(kernlignore, /^package-lock\.json$/m);
+	assert.match(kernlignore, /^pnpm-lock\.yaml$/m);
+	assert.match(kernlignore, /^\.npmrc$/m);
+	assert.match(kernlignore, /^node_modules\/\*\*\/\*$/m);
+	// The starter fixture already contained a bare node_modules line —
+	// ensureLines must not duplicate it.
+	assert.equal(kernlignore.match(/^node_modules$/gm).length, 1);
 
 	const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
 	assert.ok(
