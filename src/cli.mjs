@@ -18,6 +18,10 @@ import {
 	launch,
 	log,
 } from './prepare.mjs';
+import {
+	ALLOW_VULNERABLE_PHP_ENV,
+	vulnerablePhpBlocker,
+} from './php-advisories.mjs';
 import { clearProxyUrl, clearTunnelPassword } from './proxy/tunnel.mjs';
 
 /** The mu-plugin that gates logins while a tunnel is running. */
@@ -272,6 +276,21 @@ async function runMode(root, modeName, args, cfg = null) {
 		const blocker = tunnelGuardBlocker(root, config, modeName, forwarded);
 		if (blocker) {
 			throw new Error(blocker);
+		}
+		const phpBlocker = vulnerablePhpBlocker(
+			root,
+			config,
+			modeName,
+			forwarded
+		);
+		if (phpBlocker) {
+			if (process.env[ALLOW_VULNERABLE_PHP_ENV] === '1') {
+				log(
+					`⚠ ${ALLOW_VULNERABLE_PHP_ENV}=1 — tunnelling anyway: ${phpBlocker}`
+				);
+			} else {
+				throw new Error(`refusing --tunnel: ${phpBlocker}`);
+			}
 		}
 	}
 
