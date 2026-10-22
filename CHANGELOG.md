@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `--tunnel` now refuses to publish a PHP build with a known pre-auth RCE:
+  the bundled `@php-wasm` build for the run's effective PHP branch is
+  checked against the PHP2Shell fixes (CVE-2026-109618/109619; ≥ 8.2.35 /
+  8.3.36 / 8.4.27 / 8.5.12, branches ≤ 8.1 are EOL and always refused),
+  failing closed when the build can't be determined. A pin bump to a
+  patched `@wp-playground/cli` clears it automatically.
+  `KROKEDIL_PG_ALLOW_VULNERABLE_PHP=1` knowingly overrides for one run
+  (the tool warns and proceeds). Local runs (plain http, `--https`) are
+  not gated.
+
 - Registry bookkeeping for onboarding dintero-checkout-for-woocommerce:
   `basePort` 8960 claimed in the port registry with abbreviation `dintero`,
   and the `DINTERO_TEST_*` credential names added to

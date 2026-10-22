@@ -18,6 +18,10 @@ import {
 	launch,
 	log,
 } from './prepare.mjs';
+import {
+	ALLOW_VULNERABLE_PHP_ENV,
+	vulnerablePhpBlocker,
+} from './php-advisories.mjs';
 import { clearProxyUrl, clearTunnelPassword } from './proxy/tunnel.mjs';
 
 /** The mu-plugin that gates logins while a tunnel is running. */
@@ -99,6 +103,41 @@ export function tunnelGuardBlocker(
 		`Re-run once with --fresh to install the guard (site data is reset), ` +
 		`or drop --tunnel to keep working locally.`
 	);
+}
+
+/**
+ * The pre-flight gate every --tunnel run passes before launch: the login
+ * guard first (it refuses unconditionally), then the PHP advisory gate,
+ * whose refusal ALLOW_VULNERABLE_PHP_ENV=1 downgrades to a warning.
+ *
+ * Exported for tests (the env injectable); throws on refusal.
+ *
+ * @param {string}   root     Plugin root.
+ * @param {Object}   config   Normalized plugin config.
+ * @param {string}   modeName Mode about to launch.
+ * @param {string[]} args     Args forwarded to launch().
+ * @param {Object}   [env]    Environment (process.env).
+ * @return {string|null} A warning to log before launching, or null.
+ */
+export function tunnelPreflight(
+	root,
+	config,
+	modeName,
+	args,
+	env = process.env
+) {
+	const blocker = tunnelGuardBlocker(root, config, modeName, args);
+	if (blocker) {
+		throw new Error(blocker);
+	}
+	const phpBlocker = vulnerablePhpBlocker(root, config, modeName, args);
+	if (phpBlocker) {
+		if (env[ALLOW_VULNERABLE_PHP_ENV] === '1') {
+			return `⚠ ${ALLOW_VULNERABLE_PHP_ENV}=1 — tunnelling anyway: ${phpBlocker}`;
+		}
+		throw new Error(`refusing --tunnel: ${phpBlocker}`);
+	}
+	return null;
 }
 
 /**
@@ -269,9 +308,9 @@ async function runMode(root, modeName, args, cfg = null) {
 	clearTunnelPassword(root);
 
 	if (wantsTunnel) {
-		const blocker = tunnelGuardBlocker(root, config, modeName, forwarded);
-		if (blocker) {
-			throw new Error(blocker);
+		const warning = tunnelPreflight(root, config, modeName, forwarded);
+		if (warning) {
+			log(warning);
 		}
 	}
 

@@ -15,7 +15,7 @@ import process from 'node:process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { tunnelGuardBlocker } from '../src/cli.mjs';
+import { tunnelGuardBlocker, tunnelPreflight } from '../src/cli.mjs';
 import { normalizeConfig } from '../src/config.mjs';
 import { deriveSiteId } from '../src/site-id.mjs';
 
@@ -90,6 +90,25 @@ test('tunnel guard: a warm pre-guard site is refused with the --fresh hint', () 
 	assert.match(blocker, /--fresh/);
 });
 
+// --- tunnelPreflight ----------------------------------------------------------
+
+const EOL_CONFIG = normalizeConfig({ slug: 'a-plugin', php: '8.1' });
+
+test('tunnel preflight: throws on a vulnerable PHP build', () => {
+	assert.throws(
+		() => tunnelPreflight('/x', EOL_CONFIG, 'development', [], {}),
+		/refusing --tunnel.*end-of-life/s
+	);
+});
+
+test('tunnel preflight: the env override downgrades the refusal to a warning', () => {
+	const warning = tunnelPreflight('/x', EOL_CONFIG, 'development', [], {
+		KROKEDIL_PG_ALLOW_VULNERABLE_PHP: '1',
+	});
+	assert.match(warning, /tunnelling anyway/);
+	assert.match(warning, /end-of-life/);
+});
+
 // --- argv surface (subprocess) ----------------------------------------------
 
 test('--help prints the full help on stdout and exits 0', () => {
@@ -107,6 +126,20 @@ test('--version prints the package version on stdout and exits 0', () => {
 	const res = runCli(['--version']);
 	assert.equal(res.status, 0);
 	assert.equal(res.stdout, `${pkg.version}\n`);
+});
+
+test('server --tunnel runs the PHP preflight and refuses before launching', (t) => {
+	// An EOL branch is refused regardless of the installed builds, so this
+	// stays deterministic across @wp-playground/cli pin bumps — and the
+	// refusal fires before launch, so no server (or network) is involved.
+	const root = tmpPlugin(
+		t,
+		"export default { slug: 'a-plugin', basePort: 9930, php: '8.1' };\n"
+	);
+	const res = runCli(['server', 'development', '--tunnel'], root);
+	assert.equal(res.status, 1);
+	assert.match(res.stderr, /refusing --tunnel/);
+	assert.match(res.stderr, /end-of-life/);
 });
 
 test('site-id prints this checkout id on stdout, without a config', (t) => {

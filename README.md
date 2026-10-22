@@ -173,6 +173,10 @@ The password is printed with the public URL. Set `KROKEDIL_PG_TUNNEL_PASS` (best
 
 A site provisioned before this guard existed has no symlink to it, so `--tunnel` on such a warm `start` site refuses to launch and asks for one `--fresh` run. Guarded or not, a playground is a dev site — keep production keys and real customer data out (see [Private options](#private-options-api-keys)).
 
+#### Tunnels refuse PHP builds with known pre-auth RCEs
+
+The login guard can't help against flaws in PHP itself that fire before WordPress runs — PHP2Shell (CVE-2026-109618/109619) is exactly that. The pinned Playground CLI bundles PHP as wasm builds frozen at a point release, so before opening a tunnel the tool checks the bundled build for the effective PHP branch against the minimum releases that contain the fix (8.2.35 / 8.3.36 / 8.4.27 / 8.5.12; branches ≤ 8.1 are EOL and never got one) and refuses to publish a vulnerable build. The check reads the installed `@php-wasm` packages, so a pin bump to a patched Playground release clears it automatically — nothing to configure. Local runs (plain and `--https`) are not gated. If you must tunnel anyway (e.g. a short demo where the risk is understood), set `KROKEDIL_PG_ALLOW_VULNERABLE_PHP=1` for that run; the tool then warns and proceeds.
+
 ### `--https` (local only — secure-context features, no tunnel account)
 
 ```sh
