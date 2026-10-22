@@ -106,6 +106,41 @@ export function tunnelGuardBlocker(
 }
 
 /**
+ * The pre-flight gate every --tunnel run passes before launch: the login
+ * guard first (it refuses unconditionally), then the PHP advisory gate,
+ * whose refusal ALLOW_VULNERABLE_PHP_ENV=1 downgrades to a warning.
+ *
+ * Exported for tests (the env injectable); throws on refusal.
+ *
+ * @param {string}   root     Plugin root.
+ * @param {Object}   config   Normalized plugin config.
+ * @param {string}   modeName Mode about to launch.
+ * @param {string[]} args     Args forwarded to launch().
+ * @param {Object}   [env]    Environment (process.env).
+ * @return {string|null} A warning to log before launching, or null.
+ */
+export function tunnelPreflight(
+	root,
+	config,
+	modeName,
+	args,
+	env = process.env
+) {
+	const blocker = tunnelGuardBlocker(root, config, modeName, args);
+	if (blocker) {
+		throw new Error(blocker);
+	}
+	const phpBlocker = vulnerablePhpBlocker(root, config, modeName, args);
+	if (phpBlocker) {
+		if (env[ALLOW_VULNERABLE_PHP_ENV] === '1') {
+			return `⚠ ${ALLOW_VULNERABLE_PHP_ENV}=1 — tunnelling anyway: ${phpBlocker}`;
+		}
+		throw new Error(`refusing --tunnel: ${phpBlocker}`);
+	}
+	return null;
+}
+
+/**
  * Run the CLI.
  *
  * @param {string[]} argv Arguments after the bin name.
@@ -273,24 +308,9 @@ async function runMode(root, modeName, args, cfg = null) {
 	clearTunnelPassword(root);
 
 	if (wantsTunnel) {
-		const blocker = tunnelGuardBlocker(root, config, modeName, forwarded);
-		if (blocker) {
-			throw new Error(blocker);
-		}
-		const phpBlocker = vulnerablePhpBlocker(
-			root,
-			config,
-			modeName,
-			forwarded
-		);
-		if (phpBlocker) {
-			if (process.env[ALLOW_VULNERABLE_PHP_ENV] === '1') {
-				log(
-					`⚠ ${ALLOW_VULNERABLE_PHP_ENV}=1 — tunnelling anyway: ${phpBlocker}`
-				);
-			} else {
-				throw new Error(`refusing --tunnel: ${phpBlocker}`);
-			}
+		const warning = tunnelPreflight(root, config, modeName, forwarded);
+		if (warning) {
+			log(warning);
 		}
 	}
 

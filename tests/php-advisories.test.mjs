@@ -5,6 +5,9 @@
  * One smoke test resolves the real installed @php-wasm build.
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import { normalizeConfig } from '../src/config.mjs';
@@ -13,15 +16,18 @@ import {
 	comparePhpVersions,
 	effectivePhpBranch,
 	installedPhpBuild,
+	readBlueprintPhp,
 	vulnerablePhpBlocker,
 } from '../src/php-advisories.mjs';
 import { buildModes } from '../src/prepare.mjs';
 
 const CONFIG = normalizeConfig({ slug: 'a-plugin' });
 
-const facts = (build, provisioned = false) => ({
+const facts = (build, provisioned = false, blueprintPhp) => ({
 	installedPhpBuild: () => build,
 	isProvisioned: () => provisioned,
+	// undefined = unreadable file; { php } = what the blueprint pins.
+	readBlueprintPhp: () => blueprintPhp ?? null,
 });
 
 // --- comparePhpVersions -------------------------------------------------------
@@ -120,6 +126,62 @@ test('php gate: a warm start is judged on its effective branch, not config', () 
 	);
 });
 
+test('php gate: a custom blueprint pinning an EOL branch is refused', () => {
+	// config.php is safe, but the user blueprint boots 8.1 — the gate must
+	// judge the blueprint's pin, not config.php.
+	const blocker = vulnerablePhpBlocker(
+		'/x',
+		CONFIG,
+		'start',
+		['--blueprint=custom.json'],
+		facts('8.3.36', true, { php: '8.1' })
+	);
+	assert.match(blocker, /end-of-life/);
+});
+
+test('php gate: a custom blueprint without a pin falls back to --php/default', () => {
+	// Blueprint sets no php → the CLI applies --php, else its default.
+	const safe = vulnerablePhpBlocker(
+		'/x',
+		CONFIG,
+		'start',
+		['--blueprint=custom.json', '--php=8.3'],
+		facts('8.3.36', true, { php: null })
+	);
+	assert.equal(safe, null);
+	const eol = vulnerablePhpBlocker(
+		'/x',
+		CONFIG,
+		'start',
+		['--blueprint=custom.json', '--php=8.0'],
+		facts('8.3.36', true, { php: null })
+	);
+	assert.match(eol, /end-of-life/);
+});
+
+test('php gate: an unreadable custom blueprint fails closed', () => {
+	const blocker = vulnerablePhpBlocker(
+		'/x',
+		CONFIG,
+		'start',
+		['--blueprint=missing.json'],
+		facts('8.3.36', true, undefined)
+	);
+	assert.match(blocker, /could not read a PHP version/);
+	assert.match(blocker, /missing\.json/);
+});
+
+test('php gate: a non-branch version like "latest" fails closed', () => {
+	const blocker = vulnerablePhpBlocker(
+		'/x',
+		CONFIG,
+		'start',
+		['--blueprint=custom.json'],
+		facts('8.3.36', true, { php: 'latest' })
+	);
+	assert.match(blocker, /cannot map the requested PHP version 'latest'/);
+});
+
 test('php gate: the fixed-builds map covers exactly the supported branches', () => {
 	assert.deepEqual(Object.keys(FIXED_PHP_BUILDS).sort(), [
 		'8.2',
@@ -142,4 +204,28 @@ test('installed build: resolves a real point release for 8.3', () => {
 test('installed build: returns null for a nonsense branch', () => {
 	assert.equal(installedPhpBuild('9.9'), null);
 	assert.equal(installedPhpBuild('not-a-branch'), null);
+});
+
+// --- readBlueprintPhp ----------------------------------------------------------
+
+test('blueprint pin: reads a pin, tolerates absence, fails on garbage', (t) => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-bp-'));
+	t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+	const pinned = path.join(dir, 'pinned.json');
+	fs.writeFileSync(
+		pinned,
+		JSON.stringify({ preferredVersions: { php: '8.1' } })
+	);
+	assert.deepEqual(readBlueprintPhp(pinned), { php: '8.1' });
+
+	const bare = path.join(dir, 'bare.json');
+	fs.writeFileSync(bare, '{"steps":[]}');
+	assert.deepEqual(readBlueprintPhp(bare), { php: null });
+
+	assert.equal(readBlueprintPhp(path.join(dir, 'missing.json')), null);
+
+	const garbage = path.join(dir, 'garbage.json');
+	fs.writeFileSync(garbage, 'not json');
+	assert.equal(readBlueprintPhp(garbage), null);
 });

@@ -126,14 +126,32 @@ export function installedPhpBuild(branch) {
 }
 
 /**
- * The PHP branch a launch will actually run.
+ * The PHP version a user-supplied blueprint file pins, if it can be read.
+ *
+ * @param {string} file Blueprint path (absolute, or relative to cwd like the
+ *                      --blueprint= value the Playground CLI receives).
+ * @return {{php: string|null}|null} The pinned version (null when the
+ *   blueprint sets none), or null when the file can't be read or parsed.
+ */
+export function readBlueprintPhp(file) {
+	try {
+		const blueprint = JSON.parse(fs.readFileSync(file, 'utf8'));
+		const php = blueprint?.preferredVersions?.php;
+		return { php: typeof php === 'string' ? php : null };
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * The PHP branch a launch will actually run, absent a user --blueprint=
+ * (the blocker inspects that file itself — it could pin anything).
  *
  * Blueprint runs (server modes, and a provisioning start) take the composed
  * blueprint's preferredVersions.php — which is config.php, and which the
  * Playground CLI applies over any --php flag (the blueprint's
  * preferredVersions is spread last). A warm start has no blueprint, so the
- * CLI uses --php or its own default. A user-supplied --blueprint= could pin
- * anything; config.php is the best available answer there.
+ * CLI uses --php or its own default.
  *
  * @param {Object}   config      Normalized plugin config.
  * @param {Object}   mode        Mode entry from buildModes().
@@ -160,14 +178,15 @@ export function effectivePhpBranch(config, mode, args, provisioned) {
  * closed), and null when the build is safe. The caller decides what an
  * override looks like; see ALLOW_VULNERABLE_PHP_ENV.
  *
- * Exported for tests; `facts` injects the installed-build and site-state
- * probes so verdicts are testable without real packages or sites.
+ * Exported for tests; `facts` injects the installed-build, site-state and
+ * blueprint probes so verdicts are testable without real packages or sites.
  *
  * @param {string}   root     Plugin root.
  * @param {Object}   config   Normalized plugin config.
  * @param {string}   modeName Mode about to launch.
  * @param {string[]} args     Args forwarded to launch().
- * @param {Object}   [facts]  { installedPhpBuild, isProvisioned } overrides.
+ * @param {Object}   [facts]  { installedPhpBuild, isProvisioned,
+ *                            readBlueprintPhp } overrides.
  * @return {string|null} An error message, or null when the build is safe.
  */
 export function vulnerablePhpBlocker(
@@ -175,18 +194,49 @@ export function vulnerablePhpBlocker(
 	config,
 	modeName,
 	args,
-	facts = { installedPhpBuild, isProvisioned }
+	facts = { installedPhpBuild, isProvisioned, readBlueprintPhp }
 ) {
 	const mode = buildModes(config)[modeName];
 	if (!mode || mode.setupOnly) {
 		return null;
 	}
-	const provisioned = mode.persistent ? facts.isProvisioned(root) : false;
-	const branch = effectivePhpBranch(config, mode, args, provisioned);
 
 	const remedy =
 		`Wait for a @wp-playground/cli release with patched builds, or set ` +
 		`${ALLOW_VULNERABLE_PHP_ENV}=1 to knowingly expose it anyway.`;
+
+	// A user-supplied blueprint boots instead of the composed one (on start,
+	// decideBlueprint pairs it with --reset), and it can pin any PHP version
+	// — read it rather than trusting config.php. Unreadable fails closed.
+	let branch;
+	const userBlueprint = args.find((a) => a.startsWith('--blueprint='));
+	if (userBlueprint) {
+		const file = userBlueprint.slice('--blueprint='.length);
+		const pinned = facts.readBlueprintPhp(path.resolve(root, file));
+		if (!pinned) {
+			return (
+				`could not read a PHP version from the custom blueprint ` +
+				`(${file}), so it must be assumed vulnerable to ${ADVISORY}. ` +
+				`${remedy}`
+			);
+		}
+		const phpArg = args.find((a) => a.startsWith('--php='));
+		branch =
+			pinned.php ??
+			(phpArg ? phpArg.slice('--php='.length) : CLI_DEFAULT_PHP);
+	} else {
+		const provisioned = mode.persistent ? facts.isProvisioned(root) : false;
+		branch = effectivePhpBranch(config, mode, args, provisioned);
+	}
+
+	// "latest", a full point release, or anything else that isn't a plain
+	// branch can't be checked against the installed builds — fail closed.
+	if (!/^\d+\.\d+$/.test(branch)) {
+		return (
+			`cannot map the requested PHP version '${branch}' to an installed ` +
+			`build, so it must be assumed vulnerable to ${ADVISORY}. ${remedy}`
+		);
+	}
 
 	const fixed = FIXED_PHP_BUILDS[branch];
 	if (!fixed) {
